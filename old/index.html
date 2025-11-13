@@ -1,0 +1,383 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Visualization - Grid Cell Animation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar {
+            width: 150px;
+            background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            padding: 5px;
+            gap: 10px;
+            background: linear-gradient(135deg, #ffffff, #f8f8f8);
+            max-width: calc(100vw - 170px); /* Ensure it doesn't exceed viewport minus sidebar */
+        }
+
+        .visualization-section {
+            flex: 3;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 60%;
+            padding-top: 5px;
+        }
+
+        .graph-section {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            min-width: 300px;
+            max-width: 40%;
+        }
+
+        .graph-section h3 {
+            margin: 0 0 20px 0;
+            color: #4fc3f7;
+            font-size: 18px;
+        }
+
+        .curve-canvas {
+            background: #ffffff;
+            margin-bottom: 15px;
+        }
+
+        .graph-info {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            padding: 10px;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            color: #64b5f6;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .upload-section {
+            margin-bottom: 20px;
+            padding: 5px;
+        }
+
+        .upload-section h3 {
+            margin-top: 0;
+            color: #81c784;
+            font-size: 8px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: block;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #4caf50, #45a049);
+            color: white;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            background: linear-gradient(135deg, #45a049, #4caf50);
+            transform: translateY(-2px);
+        }
+
+        .file-status {
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .parameter-control {
+            margin-top: 20px;
+            padding: 15px;
+        }
+
+        .parameter-control h3 {
+            margin-top: 0;
+            color: #ffb74d;
+            font-size: 16px;
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        .slider-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .slider:hover {
+            opacity: 1;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ff6b6b;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255,107,107,0.5);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ff6b6b;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba(255,107,107,0.5);
+        }
+
+        .slider-value {
+            text-align: center;
+            margin-top: 5px;
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+        }
+
+        .controls h3 {
+            margin-top: 0;
+            color: #ba68c8;
+            font-size: 16px;
+        }
+
+        .control-button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            background: linear-gradient(135deg, #6a1b9a, #8e24aa);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:hover {
+            background: linear-gradient(135deg, #8e24aa, #6a1b9a);
+            transform: translateY(-2px);
+        }
+
+        .control-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .visualization-canvas {
+            background: #ffffff;
+            max-width: 100%;
+            max-height: 85vh;
+        }
+
+        .info-display {
+            margin-top: 20px;
+            padding: 15px;
+            font-size: 12px;
+        }
+
+        .info-display h4 {
+            margin: 0 0 10px 0;
+            color: #4fc3f7;
+        }
+
+        .info-item {
+            margin: 5px 0;
+            color: #333;
+        }
+
+        .loading-indicator {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #64b5f6;
+        }
+
+        .loading-indicator.show {
+            display: block;
+        }
+
+        .error-message {
+            display: none;
+            background: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            margin-top: 10px;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 40vh;
+            }
+            
+            .main-content {
+                flex: 1;
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+            
+            .visualization-section {
+                flex: none !important;
+            }
+            
+            .graph-section {
+                flex: none !important;
+                min-width: auto !important;
+                width: 100%;
+            }
+            
+            .visualization-canvas {
+                max-width: 100%;
+                height: auto;
+            }
+            
+            .curve-canvas {
+                max-width: 100%;
+                height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <!-- <h1>Model</h1> -->
+            <div class="upload-section">
+                <button id="load-dtw-model" class="control-button" style="background: linear-gradient(135deg, #1b5e20, #2e7d32);">DTW IB model</button>
+                <div id="dtw-model-status" class="file-status">Ready to load DTW-model-files</div>
+            </div>
+
+            <!-- The four individual upload forms were replaced by the single DTW button above -->
+
+            <div class="parameter-control">
+                <!-- <h3> Parameter Control</h3> -->
+                <div class="slider-container">
+                    <!-- <label class="slider-label">&#946 Value</label> -->
+                    <input type="range" id="parameter-slider" class="slider" min="0" max="9" value="0" step="1" disabled>
+                    <!-- <div class="slider-value" id="parameter-value">0</div> -->
+                </div>
+            </div>
+
+            <div class="controls">
+                <!-- <h3> Controls</h3> -->
+                <button id="play-pause" class="control-button" disabled>Play/Pause</button>
+                <button id="reset" class="control-button" disabled>Reset</button>
+                <button id="zoom-in" class="control-button" disabled>Zoom In</button>
+                <button id="zoom-out" class="control-button" disabled>Zoom Out</button>
+
+                <video id="cell-video" width="125" height="94" style="background: #000; border-radius: 5px; margin-top: 10px;" controls loop>
+                    Your browser does not support the video tag.
+                </video>
+
+            </div>
+
+            <div class="info-display">
+                <!-- <h4> Info</h4> -->
+                <!-- <div class="info-item">Grid: <span id="grid-size">-</span></div> -->
+                <!-- <div class="info-item">Cell Size: <span id="cell-size">-</span></div> -->
+                <!-- <div class="info-item">Frames: <span id="frame-count">-</span></div> -->
+                <!-- <div class="info-item">Parameters: <span id="param-count">-</span></div> -->
+                <!-- <div class="info-item">FPS: <span id="fps-display">-</span></div> -->
+            </div>
+
+            <div class="loading-indicator" id="loading">
+                <div> Processing...</div>
+            </div>
+
+            <div class="error-message" id="error-message"></div>
+        </div>
+
+        <div class="main-content">
+            <div class="visualization-section">
+                <div style="position: relative;">
+                    <canvas id="visualization-canvas" class="visualization-canvas" width="1000" height="750"></canvas>
+                                         <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;" width="1000" height="750"></canvas>
+                </div>
+            </div>
+            <div class="graph-section">
+                <canvas id="curve-canvas" class="curve-canvas" width="400" height="300"></canvas>
+<!--                 <video id="cell-video" width="200" height="150" style="background: #000; border-radius: 5px; margin-top: 10px;" controls loop>
+                    Your browser does not support the video tag.
+                </video> -->
+            </div>
+        </div>
+    </div>
+
+    <script src="visualization3.js"></script>
+</body>
+</html> 
