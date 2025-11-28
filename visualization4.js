@@ -277,6 +277,46 @@ class MotionVisualizer {
                 }
             });
         }
+
+        // DTW IB model 2 bulk loader
+        const dtwBtn2 = document.getElementById('load-dtw-model-2');
+        if (dtwBtn2) {
+            dtwBtn2.addEventListener('click', async () => {
+                const statusEl = document.getElementById('dtw-model-status-2');
+                try {
+                    if (statusEl) statusEl.textContent = 'Attempting to load from files-dtw-gamma-0...';
+                    // First, try to load relative to the project (works on http/https)
+                    const loaded = await this.tryLoadDtwFromRelative2();
+                    if (loaded) {
+                        if (statusEl) statusEl.textContent = 'DTW model loaded from files-dtw-gamma-0';
+                        return;
+                    }
+                    if (window.showDirectoryPicker) {
+                        // Fallback: prompt user; hint to Desktop to quickly reach IB-results
+                        const pickerOptions = { id: 'dtw-model-2', startIn: 'desktop', mode: 'read' };
+                        let dirHandle;
+                        try {
+                            dirHandle = await window.showDirectoryPicker(pickerOptions);
+                        } catch (innerErr) {
+                            // Retry without options if not supported
+                            dirHandle = await window.showDirectoryPicker();
+                        }
+                        await this.loadDtwModelFromDirectory(dirHandle);
+                        if (statusEl) statusEl.textContent = 'DTW model loaded from selected directory';
+                    } else {
+                        if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
+                    }
+                } catch (e) {
+                    // User cancelled the picker is not an error; just update status quietly
+                    if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
+                        if (statusEl) statusEl.textContent = 'Cancelled folder selection';
+                        return;
+                    }
+                    console.error('DTW load error:', e);
+                    if (statusEl) statusEl.textContent = 'Failed to load DTW model';
+                }
+            });
+        }
     }
 
     async loadDtwModelFromDirectory(dirHandle) {
@@ -310,6 +350,31 @@ class MotionVisualizer {
         };
         try {
             const base = 'files/'; //'IB-results/DTW-model-files/';
+            const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
+            const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
+            const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
+            const curveFile = await makeFile(base + 'IB_curve.npy', 'IB_curve.npy');
+
+            await this.handleVideoUpload(videoFile);
+            await this.handleColorUpload(colorFile);
+            await this.handleBetaValuesUpload(betasFile);
+            await this.handleCurveValuesUpload(curveFile);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Try to load directly from files-dtw-gamma-0 directory
+    async tryLoadDtwFromRelative2() {
+        const makeFile = async (url, name) => {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('Failed to fetch ' + url);
+            const blob = await resp.blob();
+            return new File([blob], name, { type: 'application/octet-stream' });
+        };
+        try {
+            const base = 'files-dtw-gamma-0/';
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
