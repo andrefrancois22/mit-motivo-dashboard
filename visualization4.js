@@ -1145,13 +1145,12 @@ class MotionVisualizer {
                 
                 // Skip if coordinates are invalid
                 if (!isNaN(x) && !isNaN(y) && x !== undefined && y !== undefined) {
-                    // Draw a larger red circle marker on the point
-                    ctx.fillStyle = '#ff0000';
-                    ctx.strokeStyle = '#ffffff';
+                    // Draw a red circle marker with transparent center on the point
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.fillStyle = 'transparent';
                     ctx.lineWidth = 3;
                     ctx.beginPath();
                     ctx.arc(scaleX(x), scaleY(y), 6, 0, 2 * Math.PI); // radius 6, centered on point
-                    ctx.fill();
                     ctx.stroke();
                 }
             }
