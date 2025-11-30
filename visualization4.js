@@ -639,13 +639,9 @@ class MotionVisualizer {
         
         this.currentParameter = Math.max(0, Math.min(parameterRange - 1, mappedParameter));
         
-        // Update the regular parameter slider to match
-        // const slider = document.getElementById('parameter-slider');
-        // slider.value = this.currentParameter;
-        
         // Update display and color texture
-        // this.updateParameterDisplay();
         this.updateColorTexture();
+        this.updateLegend();
         
         // Redraw the curve with the updated circle position
         this.plotCurve();
@@ -1260,6 +1256,24 @@ class MotionVisualizer {
             legendItem.appendChild(label);
             legendSection.appendChild(legendItem);
         }
+        
+        // Add beta value legend for red dot on curve
+        if (this.betaValues && this.betaValues.length > this.currentParameter) {
+            const legendItem = document.createElement('div');
+            legendItem.className = 'legend-item';
+            
+            const circle = document.createElement('div');
+            circle.className = 'legend-circle';
+            circle.style.backgroundColor = '#ff4444';
+            
+            const label = document.createElement('span');
+            const betaValue = this.betaValues[this.currentParameter].toFixed(4);
+            label.innerHTML = `encoder q(w|m) for β = ${betaValue}`;
+            
+            legendItem.appendChild(circle);
+            legendItem.appendChild(label);
+            legendSection.appendChild(legendItem);
+        }
     }
 
     async handleMdsUpload(file) {
@@ -1657,8 +1671,9 @@ class MotionVisualizer {
             textureData
         );
         
-        // Update MDS plot colors when parameter changes
+        // Update MDS plot colors and legend when parameter changes
         this.plotMds();
+        this.updateLegend();
     }
 
 
