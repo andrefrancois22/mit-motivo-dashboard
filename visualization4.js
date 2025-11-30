@@ -633,14 +633,24 @@ class MotionVisualizer {
                 if (!this.hoveredCell || this.hoveredCell.row !== newHoveredCell.row || this.hoveredCell.col !== newHoveredCell.col) {
                     this.hoveredCell = newHoveredCell;
                     this.loadCellVideo(cellRow, cellCol);
+                    // Update MDS plot to show hover marker
+                    this.plotMds();
                 }
             } else {
-                this.hoveredCell = null;
+                if (this.hoveredCell !== null) {
+                    this.hoveredCell = null;
+                    // Update MDS plot to remove hover marker
+                    this.plotMds();
+                }
             }
         });
         
         this.canvas.addEventListener('mouseleave', () => {
-            this.hoveredCell = null;
+            if (this.hoveredCell !== null) {
+                this.hoveredCell = null;
+                // Update MDS plot to remove hover marker
+                this.plotMds();
+            }
         });
     }
 
@@ -1121,6 +1131,29 @@ class MotionVisualizer {
                 ctx.beginPath();
                 ctx.arc(scaleX(x), scaleY(y), 3, 0, 2 * Math.PI);
                 ctx.fill();
+            }
+        }
+        
+        // Draw red circle marker on hovered cell if applicable
+        if (this.hoveredCell) {
+            const { row, col } = this.hoveredCell;
+            // Make sure the hovered cell is within the MDS data bounds
+            if (row >= 0 && row < m && col >= 0 && col < n) {
+                const pointIndex = row * n + col;
+                const x = xCoords[pointIndex];
+                const y = yCoords[pointIndex];
+                
+                // Skip if coordinates are invalid
+                if (!isNaN(x) && !isNaN(y) && x !== undefined && y !== undefined) {
+                    // Draw a larger red circle marker on the point
+                    ctx.fillStyle = '#ff0000';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(scaleX(x), scaleY(y), 6, 0, 2 * Math.PI); // radius 6, centered on point
+                    ctx.fill();
+                    ctx.stroke();
+                }
             }
         }
     }
