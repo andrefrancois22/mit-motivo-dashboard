@@ -1105,8 +1105,8 @@ class MotionVisualizer {
                 if (isNaN(x) || isNaN(y) || x === undefined || y === undefined) continue;
                 
                 // Get RGB color for this cell at current parameter
-                // Ensure row and col are within bounds
-                const gridRow = Math.min(row, gridM - 1);
+                // Vertically flip the row index to match the color grid orientation
+                const gridRow = Math.min(gridM - 1 - row, gridM - 1);
                 const gridCol = Math.min(col, gridN - 1);
                 
                 const r = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
