@@ -19,6 +19,8 @@ class MotionVisualizer {
         this.curveData = null;
         this.mdsData = null;
         this.referencePoint = null; // { x, y, label }
+        this.pwmColormaps = {}; // Object mapping labels to PWM colormap data
+        this.activePwmColormap = null; // Currently active PWM colormap label, or null if using parameter-based
         
         // Curve slider state
         this.curveSliderPosition = 0; // Index along the curve
@@ -355,6 +357,15 @@ class MotionVisualizer {
         const curveFile = await readFile('IB_curve.npy');
         const mdsFile = await readFileOptional('dtw_mds.npy');
         const refPointData = await findFileByPattern('Ix_Iy_');
+        const findPwmFileByLabel = async (label) => {
+            const pattern = `colormap_pwm_${label}.npy`;
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file' && entry.name === pattern) {
+                    return { file: await entry.getFile(), name: entry.name };
+                }
+            }
+            return null;
+        };
 
         await this.handleVideoUpload(videoFile);
         await this.handleColorUpload(colorFile);
@@ -365,6 +376,12 @@ class MotionVisualizer {
         }
         if (refPointData) {
             await this.handleReferencePointUpload(refPointData.file, refPointData.name);
+            // Try to load corresponding PWM colormap
+            const label = refPointData.name.replace('Ix_Iy_', '').replace('.npy', '');
+            const pwmData = await findPwmFileByLabel(label);
+            if (pwmData) {
+                await this.handlePwmColormapUpload(pwmData.file, pwmData.name);
+            }
         }
     }
 
@@ -400,6 +417,15 @@ class MotionVisualizer {
                 try {
                     const refFile = await makeFile(base + pattern, pattern);
                     await this.handleReferencePointUpload(refFile, pattern);
+                    // Try to load corresponding PWM colormap
+                    const label = pattern.replace('Ix_Iy_', '').replace('.npy', '');
+                    const pwmPattern = `colormap_pwm_${label}.npy`;
+                    try {
+                        const pwmFile = await makeFile(base + pwmPattern, pwmPattern);
+                        await this.handlePwmColormapUpload(pwmFile, pwmPattern);
+                    } catch (e) {
+                        // PWM colormap not found, skip
+                    }
                     break;
                 } catch (e) {
                     // Continue or skip if not found
@@ -443,6 +469,15 @@ class MotionVisualizer {
                 try {
                     const refFile = await makeFile(base + pattern, pattern);
                     await this.handleReferencePointUpload(refFile, pattern);
+                    // Try to load corresponding PWM colormap
+                    const label = pattern.replace('Ix_Iy_', '').replace('.npy', '');
+                    const pwmPattern = `colormap_pwm_${label}.npy`;
+                    try {
+                        const pwmFile = await makeFile(base + pwmPattern, pwmPattern);
+                        await this.handlePwmColormapUpload(pwmFile, pwmPattern);
+                    } catch (e) {
+                        // PWM colormap not found, skip
+                    }
                     break;
                 } catch (e) {
                     // Continue or skip if not found
@@ -463,6 +498,17 @@ class MotionVisualizer {
             const rect = curveCanvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+            
+            // Check if click is on the reference point
+            const refPointPos = this.getReferencePointScreenPosition();
+            if (refPointPos) {
+                const distance = Math.sqrt(Math.pow(x - refPointPos.x, 2) + Math.pow(y - refPointPos.y, 2));
+                if (distance <= 8) { // 8px radius for click detection
+                    this.togglePwmColormap();
+                    e.preventDefault();
+                    return;
+                }
+            }
             
             // Check if click is near the slider circle
             const circlePos = this.getCurveSliderScreenPosition();
@@ -487,11 +533,23 @@ class MotionVisualizer {
                 this.updateCurveSliderFromMouse(x, y);
                 e.preventDefault();
             } else {
+                // Check if hovering over reference point
+                const refPointPos = this.getReferencePointScreenPosition();
+                if (refPointPos) {
+                    const distance = Math.sqrt(Math.pow(x - refPointPos.x, 2) + Math.pow(y - refPointPos.y, 2));
+                    if (distance <= 8) {
+                        curveCanvas.style.cursor = 'pointer';
+                        return;
+                    }
+                }
+                
                 // Check if hovering over slider circle
                 const circlePos = this.getCurveSliderScreenPosition();
                 if (circlePos) {
                     const distance = Math.sqrt(Math.pow(x - circlePos.x, 2) + Math.pow(y - circlePos.y, 2));
                     curveCanvas.style.cursor = distance <= 8 ? 'grab' : 'default';
+                } else {
+                    curveCanvas.style.cursor = 'default';
                 }
             }
         });
@@ -605,6 +663,50 @@ class MotionVisualizer {
         
         // Redraw the curve with the updated circle position
         this.plotCurve();
+    }
+    
+    getReferencePointScreenPosition() {
+        if (!this.referencePoint || !this.curveData) return null;
+        
+        const canvas = document.getElementById('curve-canvas');
+        const { x, y } = this.curveData;
+        
+        // Calculate the same scaling as in plotCurve
+        const xMin = Math.min(...x);
+        const xMax = Math.max(...x);
+        const yMin = Math.min(...y);
+        const yMax = Math.max(...y);
+        
+        const margin = 40;
+        const plotWidth = canvas.width - 2 * margin;
+        const plotHeight = canvas.height - 2 * margin;
+        
+        const scaleX = (val) => margin + ((val - xMin) / (xMax - xMin)) * plotWidth;
+        const scaleY = (val) => canvas.height - margin - ((val - yMin) / (yMax - yMin)) * plotHeight;
+        
+        return {
+            x: scaleX(this.referencePoint.x),
+            y: scaleY(this.referencePoint.y)
+        };
+    }
+    
+    togglePwmColormap() {
+        if (!this.referencePoint || !this.pwmColormaps[this.referencePoint.label]) {
+            return;
+        }
+        
+        // Toggle: if currently using this PWM colormap, switch back to parameter-based
+        if (this.activePwmColormap === this.referencePoint.label) {
+            this.activePwmColormap = null;
+        } else {
+            this.activePwmColormap = this.referencePoint.label;
+        }
+        
+        console.log('PWM colormap toggled:', this.activePwmColormap);
+        
+        // Update color textures and plots
+        this.updateColorTexture();
+        this.plotMds();
     }
 
     setupMouseControls() {
@@ -948,9 +1050,49 @@ class MotionVisualizer {
             this.updateLegend();
             this.plotCurve();
             
+            // Try to load corresponding PWM colormap if available
+            const pwmFilename = `colormap_pwm_${label}.npy`;
+            // PWM colormap will be loaded separately when loading model files
+            
         } catch (error) {
             console.error('Reference point upload error:', error);
             this.showError('Error loading reference point: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async handlePwmColormapUpload(file, filename) {
+        if (!file) return;
+        
+        this.showLoading(true);
+        console.log('PWM colormap file upload started:', file.name);
+        
+        try {
+            const buffer = await file.arrayBuffer();
+            const pwmData = await this.parseNumpyArray(buffer);
+            console.log('Parsed PWM colormap array:', pwmData.shape, pwmData.dtype);
+            
+            // Validate PWM colormap shape - should be 3D array (m, n, 3)
+            if (pwmData.shape.length !== 3 || pwmData.shape[2] !== 3) {
+                throw new Error(`PWM colormap must be a 3D array with shape (m, n, 3), got shape [${pwmData.shape.join(', ')}]`);
+            }
+            
+            // Extract label from filename (everything after 'colormap_pwm_')
+            const label = filename.replace('colormap_pwm_', '').replace('.npy', '');
+            
+            // Store the PWM colormap with the label
+            this.pwmColormaps[label] = {
+                data: pwmData.data,
+                shape: pwmData.shape,
+                dtype: pwmData.dtype
+            };
+            
+            console.log('PWM colormap loaded for label:', label);
+            
+        } catch (error) {
+            console.error('PWM colormap upload error:', error);
+            this.showError('Error loading PWM colormap: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -1226,23 +1368,38 @@ class MotionVisualizer {
                 // Skip if coordinates are invalid (NaN or undefined)
                 if (isNaN(x) || isNaN(y) || x === undefined || y === undefined) continue;
                 
-                // Get RGB color for this cell at current parameter
-                // Vertically flip the row index to match the color grid orientation
-                const gridRow = Math.min(gridM - 1 - row, gridM - 1);
-                const gridCol = Math.min(col, gridN - 1);
+                // Get RGB color - use PWM colormap if active, otherwise use parameter-based
+                let r, g, b;
                 
-                const r = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
-                                                   gridCol * (channels * parameters) + 
-                                                   0 * parameters + 
-                                                   currentParam];
-                const g = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
-                                                   gridCol * (channels * parameters) + 
-                                                   1 * parameters + 
-                                                   currentParam];
-                const b = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
-                                                   gridCol * (channels * parameters) + 
-                                                   2 * parameters + 
-                                                   currentParam];
+                if (this.activePwmColormap && this.pwmColormaps[this.activePwmColormap]) {
+                    const pwmColormap = this.pwmColormaps[this.activePwmColormap];
+                    const [pwmM, pwmN, pwmChannels] = pwmColormap.shape;
+                    const gridRow = Math.min(gridM - 1 - row, pwmM - 1);
+                    const gridCol = Math.min(col, pwmN - 1);
+                    
+                    // PWM colormap shape: (m, n, 3)
+                    const idx = gridRow * (pwmN * pwmChannels) + gridCol * pwmChannels;
+                    r = pwmColormap.data[idx + 0];
+                    g = pwmColormap.data[idx + 1];
+                    b = pwmColormap.data[idx + 2];
+                } else {
+                    // Use parameter-based colors from colorGridData
+                    const gridRow = Math.min(gridM - 1 - row, gridM - 1);
+                    const gridCol = Math.min(col, gridN - 1);
+                    
+                    r = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
+                                                 gridCol * (channels * parameters) + 
+                                                 0 * parameters + 
+                                                 currentParam];
+                    g = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
+                                                 gridCol * (channels * parameters) + 
+                                                 1 * parameters + 
+                                                 currentParam];
+                    b = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
+                                                 gridCol * (channels * parameters) + 
+                                                 2 * parameters + 
+                                                 currentParam];
+                }
                 
                 // Convert to 0-255 range and draw point
                 const r255 = Math.floor(Math.max(0, Math.min(1, r)) * 255);
@@ -1435,18 +1592,42 @@ class MotionVisualizer {
         // Create texture data - one pixel per cell
         const textureData = new Uint8Array(n * m * 3);
         
-        // Fill texture with colors for current parameter
-        for (let row = 0; row < m; row++) {
-            for (let col = 0; col < n; col++) {
-                const r = this.colorGridData.data[row * (n * channels * parameters) + col * (channels * parameters) + 0 * parameters + this.currentParameter];
-                const g = this.colorGridData.data[row * (n * channels * parameters) + col * (channels * parameters) + 1 * parameters + this.currentParameter];
-                const b = this.colorGridData.data[row * (n * channels * parameters) + col * (channels * parameters) + 2 * parameters + this.currentParameter];
-                
-                // Texture coordinates: x=col, y=row
-                const textureIndex = (row * n + col) * 3;
-                textureData[textureIndex + 0] = Math.floor(Math.max(0, Math.min(1, r)) * 255);
-                textureData[textureIndex + 1] = Math.floor(Math.max(0, Math.min(1, g)) * 255);
-                textureData[textureIndex + 2] = Math.floor(Math.max(0, Math.min(1, b)) * 255);
+        // Check if PWM colormap is active
+        if (this.activePwmColormap && this.pwmColormaps[this.activePwmColormap]) {
+            const pwmColormap = this.pwmColormaps[this.activePwmColormap];
+            const [pwmM, pwmN, pwmChannels] = pwmColormap.shape;
+            
+            // Use PWM colormap instead of parameter-based colors
+            for (let row = 0; row < Math.min(m, pwmM); row++) {
+                for (let col = 0; col < Math.min(n, pwmN); col++) {
+                    // PWM colormap shape: (m, n, 3)
+                    // Access: row * (n * 3) + col * 3 + channel
+                    const idx = row * (pwmN * pwmChannels) + col * pwmChannels;
+                    const r = pwmColormap.data[idx + 0];
+                    const g = pwmColormap.data[idx + 1];
+                    const b = pwmColormap.data[idx + 2];
+                    
+                    // Texture coordinates: x=col, y=row
+                    const textureIndex = (row * n + col) * 3;
+                    textureData[textureIndex + 0] = Math.floor(Math.max(0, Math.min(1, r)) * 255);
+                    textureData[textureIndex + 1] = Math.floor(Math.max(0, Math.min(1, g)) * 255);
+                    textureData[textureIndex + 2] = Math.floor(Math.max(0, Math.min(1, b)) * 255);
+                }
+            }
+        } else {
+            // Use parameter-based colors from colorGridData
+            for (let row = 0; row < m; row++) {
+                for (let col = 0; col < n; col++) {
+                    const r = this.colorGridData.data[row * (n * channels * parameters) + col * (channels * parameters) + 0 * parameters + this.currentParameter];
+                    const g = this.colorGridData.data[row * (n * channels * parameters) + col * (channels * parameters) + 1 * parameters + this.currentParameter];
+                    const b = this.colorGridData.data[row * (n * channels * parameters) + col * (channels * parameters) + 2 * parameters + this.currentParameter];
+                    
+                    // Texture coordinates: x=col, y=row
+                    const textureIndex = (row * n + col) * 3;
+                    textureData[textureIndex + 0] = Math.floor(Math.max(0, Math.min(1, r)) * 255);
+                    textureData[textureIndex + 1] = Math.floor(Math.max(0, Math.min(1, g)) * 255);
+                    textureData[textureIndex + 2] = Math.floor(Math.max(0, Math.min(1, b)) * 255);
+                }
             }
         }
         
