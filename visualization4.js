@@ -18,6 +18,7 @@ class MotionVisualizer {
         this.betaValues = null;
         this.curveData = null;
         this.mdsData = null;
+        this.referencePoint = null; // { x, y, label }
         
         // Curve slider state
         this.curveSliderPosition = 0; // Index along the curve
@@ -338,12 +339,22 @@ class MotionVisualizer {
             }
             return null;
         };
+        
+        const findFileByPattern = async (pattern) => {
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file' && entry.name.startsWith(pattern) && entry.name.endsWith('.npy')) {
+                    return { file: await entry.getFile(), name: entry.name };
+                }
+            }
+            return null;
+        };
 
         const videoFile = await readFile('video_gray.npy_prepped_video.npy');
         const colorFile = await readFile('colormap_n_951.npy');
         const betasFile = await readFile('betas.npy');
         const curveFile = await readFile('IB_curve.npy');
         const mdsFile = await readFileOptional('dtw_mds.npy');
+        const refPointData = await findFileByPattern('Ix_Iy_');
 
         await this.handleVideoUpload(videoFile);
         await this.handleColorUpload(colorFile);
@@ -351,6 +362,9 @@ class MotionVisualizer {
         await this.handleCurveValuesUpload(curveFile);
         if (mdsFile) {
             await this.handleMdsUpload(mdsFile);
+        }
+        if (refPointData) {
+            await this.handleReferencePointUpload(refPointData.file, refPointData.name);
         }
     }
 
@@ -379,6 +393,17 @@ class MotionVisualizer {
                 await this.handleMdsUpload(mdsFile);
             } catch (e) {
                 console.log('MDS file not available, skipping...');
+            }
+            // Try to load reference point file (optional)
+            const refPointPatterns = ['Ix_Iy_English-Psynet.npy'];
+            for (const pattern of refPointPatterns) {
+                try {
+                    const refFile = await makeFile(base + pattern, pattern);
+                    await this.handleReferencePointUpload(refFile, pattern);
+                    break;
+                } catch (e) {
+                    // Continue or skip if not found
+                }
             }
             return true;
         } catch (e) {
@@ -411,6 +436,17 @@ class MotionVisualizer {
                 await this.handleMdsUpload(mdsFile);
             } catch (e) {
                 console.log('MDS file not available, skipping...');
+            }
+            // Try to load reference point file (optional)
+            const refPointPatterns = ['Ix_Iy_English-Psynet.npy'];
+            for (const pattern of refPointPatterns) {
+                try {
+                    const refFile = await makeFile(base + pattern, pattern);
+                    await this.handleReferencePointUpload(refFile, pattern);
+                    break;
+                } catch (e) {
+                    // Continue or skip if not found
+                }
             }
             return true;
         } catch (e) {
@@ -882,6 +918,43 @@ class MotionVisualizer {
         }
     }
 
+    async handleReferencePointUpload(file, filename) {
+        if (!file) return;
+        
+        this.showLoading(true);
+        console.log('Reference point file upload started:', file.name);
+        
+        try {
+            const buffer = await file.arrayBuffer();
+            const refData = await this.parseNumpyArray(buffer);
+            console.log('Parsed reference point array:', refData.shape, refData.dtype);
+            
+            // Validate reference point data - should be 1D array with 2 values
+            if (refData.shape.length !== 1 || refData.shape[0] !== 2) {
+                throw new Error(`Reference point must be a 1D array with 2 values, got shape [${refData.shape.join(', ')}]`);
+            }
+            
+            // Extract coordinates
+            const x = refData.data[0];
+            const y = refData.data[1];
+            
+            // Extract label from filename (everything after 'Ix_Iy_')
+            const label = filename.replace('Ix_Iy_', '').replace('.npy', '');
+            
+            this.referencePoint = { x, y, label };
+            console.log('Reference point loaded:', this.referencePoint);
+            
+            // Redraw curve to show the new point
+            this.plotCurve();
+            
+        } catch (error) {
+            console.error('Reference point upload error:', error);
+            this.showError('Error loading reference point: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
     updateCurveStatus(status) {
         const statusElement = document.getElementById('curve-status');
         if (statusElement) {
@@ -980,6 +1053,47 @@ class MotionVisualizer {
             ctx.arc(circlePos.x, circlePos.y, 6, 0, 2 * Math.PI);
             ctx.fill();
             ctx.stroke();
+        }
+        
+        // Draw reference point if available
+        if (this.referencePoint) {
+            const refX = scaleX(this.referencePoint.x);
+            const refY = scaleY(this.referencePoint.y);
+            
+            // Check if point is within plot bounds
+            if (refX >= margin && refX <= canvas.width - margin && 
+                refY >= margin && refY <= canvas.height - margin) {
+                
+                // Draw point
+                ctx.fillStyle = '#0000ff'; // Blue color for reference point
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(refX, refY, 5, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            // Always draw legend (even if point is outside bounds)
+            const squareSize = 10;
+            const squareX = margin + 5;
+            const squareY = margin + 5;
+            const textX = squareX + squareSize + 5;
+            const textY = squareY + squareSize - 2;
+            
+            // Draw small colored square for legend
+            ctx.fillStyle = '#0000ff';
+            ctx.fillRect(squareX, squareY, squareSize, squareSize);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(squareX, squareY, squareSize, squareSize);
+            
+            // Draw legend text
+            ctx.fillStyle = '#333';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'left';
+            const legendText = this.referencePoint.label || 'Reference';
+            ctx.fillText(legendText, textX, textY);
         }
     }
 
