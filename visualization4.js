@@ -17,6 +17,7 @@ class MotionVisualizer {
         this.gridInfo = null;
         this.betaValues = null;
         this.curveData = null;
+        this.mdsData = null;
         
         // Curve slider state
         this.curveSliderPosition = 0; // Index along the curve
@@ -328,16 +329,29 @@ class MotionVisualizer {
             }
             throw new Error(`File not found: ${name}`);
         };
+        
+        const readFileOptional = async (name) => {
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file' && entry.name === name) {
+                    return await entry.getFile();
+                }
+            }
+            return null;
+        };
 
         const videoFile = await readFile('video_gray.npy_prepped_video.npy');
         const colorFile = await readFile('colormap_n_951.npy');
         const betasFile = await readFile('betas.npy');
         const curveFile = await readFile('IB_curve.npy');
+        const mdsFile = await readFileOptional('dtw_mds.npy');
 
         await this.handleVideoUpload(videoFile);
         await this.handleColorUpload(colorFile);
         await this.handleBetaValuesUpload(betasFile);
         await this.handleCurveValuesUpload(curveFile);
+        if (mdsFile) {
+            await this.handleMdsUpload(mdsFile);
+        }
     }
 
     // Try to load directly from project-relative directory (works when served over http/https). Falls back silently on file://
@@ -354,11 +368,18 @@ class MotionVisualizer {
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
             const curveFile = await makeFile(base + 'IB_curve.npy', 'IB_curve.npy');
+            const mdsFile = await makeFile(base + 'dtw_mds.npy', 'dtw_mds.npy');
 
             await this.handleVideoUpload(videoFile);
             await this.handleColorUpload(colorFile);
             await this.handleBetaValuesUpload(betasFile);
             await this.handleCurveValuesUpload(curveFile);
+            // Load MDS data if available (optional)
+            try {
+                await this.handleMdsUpload(mdsFile);
+            } catch (e) {
+                console.log('MDS file not available, skipping...');
+            }
             return true;
         } catch (e) {
             return false;
@@ -379,11 +400,18 @@ class MotionVisualizer {
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
             const curveFile = await makeFile(base + 'IB_curve.npy', 'IB_curve.npy');
+            const mdsFile = await makeFile(base + 'dtw_mds.npy', 'dtw_mds.npy');
 
             await this.handleVideoUpload(videoFile);
             await this.handleColorUpload(colorFile);
             await this.handleBetaValuesUpload(betasFile);
             await this.handleCurveValuesUpload(curveFile);
+            // Load MDS data if available (optional)
+            try {
+                await this.handleMdsUpload(mdsFile);
+            } catch (e) {
+                console.log('MDS file not available, skipping...');
+            }
             return true;
         } catch (e) {
             return false;
@@ -945,6 +973,158 @@ class MotionVisualizer {
         }
     }
 
+    async handleMdsUpload(file) {
+        if (!file) return;
+        
+        this.showLoading(true);
+        console.log('MDS file upload started:', file.name, file.size, 'bytes');
+        
+        try {
+            const buffer = await file.arrayBuffer();
+            console.log('Buffer loaded, size:', buffer.byteLength);
+            
+            const mdsData = await this.parseNumpyArray(buffer);
+            console.log('Parsed numpy array:', mdsData.shape, mdsData.dtype);
+            
+            // Validate MDS data shape - should be 3D array (m, n, 2)
+            if (mdsData.shape.length !== 3 || mdsData.shape[2] !== 2) {
+                throw new Error(`MDS data must be a 3D array with shape (m, n, 2), got shape [${mdsData.shape.join(', ')}]`);
+            }
+            
+            // Store the MDS data
+            const [m, n, coords] = mdsData.shape;
+            this.mdsData = {
+                m: m,
+                n: n,
+                coords: mdsData.data, // Full flattened array
+                shape: mdsData.shape
+            };
+            
+            console.log('MDS data loaded:', m, 'x', n, 'grid');
+            
+            // Plot the MDS coordinates
+            this.plotMds();
+            
+        } catch (error) {
+            console.error('MDS upload error:', error);
+            this.showError('Error loading MDS data: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    plotMds() {
+        if (!this.mdsData || !this.colorGridData) return;
+        
+        const canvas = document.getElementById('mds-canvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const { m, n, coords } = this.mdsData;
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Extract x and y coordinates from the flattened array
+        // Data is stored as (m, n, 2) - row major order
+        // For each (row, col), coordinates are at indices: (row * n + col) * 2 and (row * n + col) * 2 + 1
+        const xCoords = [];
+        const yCoords = [];
+        
+        for (let row = 0; row < m; row++) {
+            for (let col = 0; col < n; col++) {
+                const idx = (row * n + col) * 2;
+                xCoords.push(coords[idx]);
+                yCoords.push(coords[idx + 1]);
+            }
+        }
+        
+        // Calculate ranges for scaling
+        const xMin = Math.min(...xCoords);
+        const xMax = Math.max(...xCoords);
+        const yMin = Math.min(...yCoords);
+        const yMax = Math.max(...yCoords);
+        
+        const margin = 40;
+        const plotWidth = canvas.width - 2 * margin;
+        const plotHeight = canvas.height - 2 * margin;
+        
+        // Scale functions
+        const scaleX = (val) => margin + ((val - xMin) / (xMax - xMin || 1)) * plotWidth;
+        const scaleY = (val) => canvas.height - margin - ((val - yMin) / (yMax - yMin || 1)) * plotHeight;
+        
+        // Draw axes
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // X axis
+        ctx.moveTo(margin, canvas.height - margin);
+        ctx.lineTo(canvas.width - margin, canvas.height - margin);
+        // Y axis
+        ctx.moveTo(margin, margin);
+        ctx.lineTo(margin, canvas.height - margin);
+        ctx.stroke();
+        
+        // Draw axis labels
+        ctx.fillStyle = '#333';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        
+        // X-axis label
+        ctx.fillText('MDS Dimension 1', canvas.width / 2, canvas.height - 5);
+        
+        // Y-axis label
+        ctx.save();
+        ctx.translate(15, canvas.height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('MDS Dimension 2', 0, 0);
+        ctx.restore();
+        
+        // Get color grid dimensions
+        const [gridM, gridN, channels, parameters] = this.colorGridData.shape;
+        const currentParam = this.currentParameter;
+        
+        // Plot each point with color from color grid
+        for (let row = 0; row < m; row++) {
+            for (let col = 0; col < n; col++) {
+                const pointIndex = row * n + col;
+                const x = xCoords[pointIndex];
+                const y = yCoords[pointIndex];
+                
+                // Skip if coordinates are invalid (NaN or undefined)
+                if (isNaN(x) || isNaN(y) || x === undefined || y === undefined) continue;
+                
+                // Get RGB color for this cell at current parameter
+                // Ensure row and col are within bounds
+                const gridRow = Math.min(row, gridM - 1);
+                const gridCol = Math.min(col, gridN - 1);
+                
+                const r = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
+                                                   gridCol * (channels * parameters) + 
+                                                   0 * parameters + 
+                                                   currentParam];
+                const g = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
+                                                   gridCol * (channels * parameters) + 
+                                                   1 * parameters + 
+                                                   currentParam];
+                const b = this.colorGridData.data[gridRow * (gridN * channels * parameters) + 
+                                                   gridCol * (channels * parameters) + 
+                                                   2 * parameters + 
+                                                   currentParam];
+                
+                // Convert to 0-255 range and draw point
+                const r255 = Math.floor(Math.max(0, Math.min(1, r)) * 255);
+                const g255 = Math.floor(Math.max(0, Math.min(1, g)) * 255);
+                const b255 = Math.floor(Math.max(0, Math.min(1, b)) * 255);
+                
+                ctx.fillStyle = `rgb(${r255}, ${g255}, ${b255})`;
+                ctx.beginPath();
+                ctx.arc(scaleX(x), scaleY(y), 3, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+    }
+
     async parseNumpyArray(buffer) {
         // Simple numpy array parser for .npy files
         const dataView = new DataView(buffer);
@@ -1126,6 +1306,9 @@ class MotionVisualizer {
             n, m, 0, this.gl.RGB, this.gl.UNSIGNED_BYTE,
             textureData
         );
+        
+        // Update MDS plot colors when parameter changes
+        this.plotMds();
     }
 
 
