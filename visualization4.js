@@ -707,6 +707,8 @@ class MotionVisualizer {
         // Update color textures and plots
         this.updateColorTexture();
         this.plotMds();
+        // Redraw curve to update marker visibility
+        this.plotCurve();
     }
 
     setupMouseControls() {
@@ -1206,6 +1208,19 @@ class MotionVisualizer {
             // Check if point is within plot bounds
             if (refX >= margin && refX <= canvas.width - margin && 
                 refY >= margin && refY <= canvas.height - margin) {
+                
+                // Check if this reference point is currently active (clicked)
+                const isActive = this.activePwmColormap === this.referencePoint.label;
+                
+                // Draw marker around point if active (clicked)
+                if (isActive) {
+                    ctx.strokeStyle = '#0000ff'; // Blue border matching the point color
+                    ctx.fillStyle = 'transparent';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(refX, refY, 10, 0, 2 * Math.PI); // Larger circle for marker
+                    ctx.stroke();
+                }
                 
                 // Draw point
                 ctx.fillStyle = '#0000ff'; // Blue color for reference point
