@@ -47,6 +47,32 @@
             padding-top: 5px;
         }
 
+        .legend-section {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: flex-start;
+            padding: 10px;
+            min-width: 150px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .legend-circle {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
         .graph-section {
             flex: 2;
             display: flex;
@@ -371,6 +397,9 @@
                     <canvas id="visualization-canvas" class="visualization-canvas" width="1000" height="750"></canvas>
                                          <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;" width="1000" height="750"></canvas>
                 </div>
+            </div>
+            <div class="legend-section" id="legend-section">
+                <!-- Legend will be dynamically added here -->
             </div>
             <div class="graph-section">
                 <canvas id="curve-canvas" class="curve-canvas" width="400" height="300"></canvas>

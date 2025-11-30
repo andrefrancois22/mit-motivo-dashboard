@@ -944,7 +944,8 @@ class MotionVisualizer {
             this.referencePoint = { x, y, label };
             console.log('Reference point loaded:', this.referencePoint);
             
-            // Redraw curve to show the new point
+            // Update legend and redraw curve to show the new point
+            this.updateLegend();
             this.plotCurve();
             
         } catch (error) {
@@ -1073,27 +1074,34 @@ class MotionVisualizer {
                 ctx.fill();
                 ctx.stroke();
             }
+        }
+        
+        // Update legend in HTML (separate from canvas drawing)
+        this.updateLegend();
+    }
+
+    updateLegend() {
+        const legendSection = document.getElementById('legend-section');
+        if (!legendSection) return;
+        
+        // Clear existing legend
+        legendSection.innerHTML = '';
+        
+        // Add reference point legend if available
+        if (this.referencePoint) {
+            const legendItem = document.createElement('div');
+            legendItem.className = 'legend-item';
             
-            // Always draw legend (even if point is outside bounds)
-            const squareSize = 10;
-            const squareX = margin + 5;
-            const squareY = margin + 5;
-            const textX = squareX + squareSize + 5;
-            const textY = squareY + squareSize - 2;
+            const circle = document.createElement('div');
+            circle.className = 'legend-circle';
+            circle.style.backgroundColor = '#0000ff';
             
-            // Draw small colored square for legend
-            ctx.fillStyle = '#0000ff';
-            ctx.fillRect(squareX, squareY, squareSize, squareSize);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(squareX, squareY, squareSize, squareSize);
+            const label = document.createElement('span');
+            label.textContent = this.referencePoint.label || 'Reference';
             
-            // Draw legend text
-            ctx.fillStyle = '#333';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'left';
-            const legendText = this.referencePoint.label || 'Reference';
-            ctx.fillText(legendText, textX, textY);
+            legendItem.appendChild(circle);
+            legendItem.appendChild(label);
+            legendSection.appendChild(legendItem);
         }
     }
 
