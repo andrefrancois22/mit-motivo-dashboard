@@ -21,6 +21,8 @@ class MotionVisualizer {
         this.referencePoint = null; // { x, y, label }
         this.pwmColormaps = {}; // Object mapping labels to PWM colormap data
         this.activePwmColormap = null; // Currently active PWM colormap label, or null if using parameter-based
+        this.pwmData = {}; // Object mapping labels to PWM data (m, n, L)
+        this.lexiconLabels = {}; // Object mapping labels to lexicon label arrays
         
         // Curve slider state
         this.curveSliderPosition = 0; // Index along the curve
@@ -382,6 +384,33 @@ class MotionVisualizer {
             if (pwmData) {
                 await this.handlePwmColormapUpload(pwmData.file, pwmData.name);
             }
+            // Try to load PWM data and lexicon labels
+            const findPwmDataFile = async (label) => {
+                const pattern = `pwm_${label}.npy`;
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file' && entry.name === pattern) {
+                        return { file: await entry.getFile(), name: entry.name };
+                    }
+                }
+                return null;
+            };
+            const findLexiconFile = async (label) => {
+                const pattern = `lexicon_labels_${label}.pkl`;
+                for await (const entry of dirHandle.values()) {
+                    if (entry.kind === 'file' && entry.name === pattern) {
+                        return { file: await entry.getFile(), name: entry.name };
+                    }
+                }
+                return null;
+            };
+            const pwmDataFile = await findPwmDataFile(label);
+            const lexiconFile = await findLexiconFile(label);
+            if (pwmDataFile) {
+                await this.handlePwmDataUpload(pwmDataFile.file, pwmDataFile.name);
+            }
+            if (lexiconFile) {
+                await this.handleLexiconLabelsUpload(lexiconFile.file, lexiconFile.name);
+            }
         }
     }
 
@@ -417,14 +446,27 @@ class MotionVisualizer {
                 try {
                     const refFile = await makeFile(base + pattern, pattern);
                     await this.handleReferencePointUpload(refFile, pattern);
-                    // Try to load corresponding PWM colormap
                     const label = pattern.replace('Ix_Iy_', '').replace('.npy', '');
+                    // Try to load corresponding PWM colormap
                     const pwmPattern = `colormap_pwm_${label}.npy`;
                     try {
                         const pwmFile = await makeFile(base + pwmPattern, pwmPattern);
                         await this.handlePwmColormapUpload(pwmFile, pwmPattern);
                     } catch (e) {
                         // PWM colormap not found, skip
+                    }
+                    // Try to load PWM data and lexicon labels
+                    try {
+                        const pwmDataFile = await makeFile(base + `pwm_${label}.npy`, `pwm_${label}.npy`);
+                        await this.handlePwmDataUpload(pwmDataFile, `pwm_${label}.npy`);
+                    } catch (e) {
+                        // PWM data not found, skip
+                    }
+                    try {
+                        const lexiconFile = await makeFile(base + `lexicon_labels_${label}.pkl`, `lexicon_labels_${label}.pkl`);
+                        await this.handleLexiconLabelsUpload(lexiconFile, `lexicon_labels_${label}.pkl`);
+                    } catch (e) {
+                        // Lexicon labels not found, skip
                     }
                     break;
                 } catch (e) {
@@ -469,14 +511,27 @@ class MotionVisualizer {
                 try {
                     const refFile = await makeFile(base + pattern, pattern);
                     await this.handleReferencePointUpload(refFile, pattern);
-                    // Try to load corresponding PWM colormap
                     const label = pattern.replace('Ix_Iy_', '').replace('.npy', '');
+                    // Try to load corresponding PWM colormap
                     const pwmPattern = `colormap_pwm_${label}.npy`;
                     try {
                         const pwmFile = await makeFile(base + pwmPattern, pwmPattern);
                         await this.handlePwmColormapUpload(pwmFile, pwmPattern);
                     } catch (e) {
                         // PWM colormap not found, skip
+                    }
+                    // Try to load PWM data and lexicon labels
+                    try {
+                        const pwmDataFile = await makeFile(base + `pwm_${label}.npy`, `pwm_${label}.npy`);
+                        await this.handlePwmDataUpload(pwmDataFile, `pwm_${label}.npy`);
+                    } catch (e) {
+                        // PWM data not found, skip
+                    }
+                    try {
+                        const lexiconFile = await makeFile(base + `lexicon_labels_${label}.pkl`, `lexicon_labels_${label}.pkl`);
+                        await this.handleLexiconLabelsUpload(lexiconFile, `lexicon_labels_${label}.pkl`);
+                    } catch (e) {
+                        // Lexicon labels not found, skip
                     }
                     break;
                 } catch (e) {
@@ -771,12 +826,16 @@ class MotionVisualizer {
                     this.loadCellVideo(cellRow, cellCol);
                     // Update MDS plot to show hover marker
                     this.plotMds();
+                    // Update PWM plot
+                    this.plotPwm();
                 }
             } else {
                 if (this.hoveredCell !== null) {
                     this.hoveredCell = null;
                     // Update MDS plot to remove hover marker
                     this.plotMds();
+                    // Clear PWM plot
+                    this.plotPwm();
                 }
             }
         });
@@ -786,6 +845,8 @@ class MotionVisualizer {
                 this.hoveredCell = null;
                 // Update MDS plot to remove hover marker
                 this.plotMds();
+                // Clear PWM plot
+                this.plotPwm();
             }
         });
     }
@@ -1091,6 +1152,113 @@ class MotionVisualizer {
         } catch (error) {
             console.error('PWM colormap upload error:', error);
             this.showError('Error loading PWM colormap: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async handlePwmDataUpload(file, filename) {
+        if (!file) return;
+        
+        this.showLoading(true);
+        console.log('PWM data file upload started:', file.name);
+        
+        try {
+            const buffer = await file.arrayBuffer();
+            const pwmData = await this.parseNumpyArray(buffer);
+            console.log('Parsed PWM data array:', pwmData.shape, pwmData.dtype);
+            
+            // Validate PWM data shape - should be 3D array (m, n, L)
+            if (pwmData.shape.length !== 3) {
+                throw new Error(`PWM data must be a 3D array with shape (m, n, L), got shape [${pwmData.shape.join(', ')}]`);
+            }
+            
+            // Extract label from filename (everything after 'pwm_')
+            const label = filename.replace('pwm_', '').replace('.npy', '');
+            
+            // Store the PWM data with the label
+            this.pwmData[label] = {
+                data: pwmData.data,
+                shape: pwmData.shape,
+                dtype: pwmData.dtype
+            };
+            
+            console.log('PWM data loaded for label:', label);
+            
+        } catch (error) {
+            console.error('PWM data upload error:', error);
+            this.showError('Error loading PWM data: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async handleLexiconLabelsUpload(file, filename) {
+        if (!file) return;
+        
+        this.showLoading(true);
+        console.log('Lexicon labels file upload started:', file.name);
+        
+        try {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            
+            // Extract label from filename
+            const label = filename.replace('lexicon_labels_', '').replace('.pkl', '');
+            
+            // Parse pickle file - try multiple approaches
+            const labels = [];
+            
+            // Approach 1: Try to decode as UTF-8 and extract quoted strings
+            const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+            const stringMatches = text.match(/'([^']+)'/g) || text.match(/"([^"]+)"/g);
+            if (stringMatches && stringMatches.length > 0) {
+                stringMatches.forEach(match => {
+                    const str = match.slice(1, -1);
+                    if (str.length > 0 && str.length < 200 && !str.includes('\x00')) {
+                        labels.push(str);
+                    }
+                });
+            }
+            
+            // Approach 2: Look for readable strings in the binary data
+            if (labels.length === 0) {
+                let currentString = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    const byte = bytes[i];
+                    // Printable ASCII range or common UTF-8 start bytes
+                    if ((byte >= 0x20 && byte < 0x7F) || (byte >= 0xC0 && byte < 0xF0)) {
+                        currentString += String.fromCharCode(byte);
+                    } else {
+                        if (currentString.length > 2 && currentString.length < 200) {
+                            // Check if it looks like a word (contains letters)
+                            if (/[a-zA-Z]/.test(currentString)) {
+                                labels.push(currentString);
+                            }
+                        }
+                        currentString = '';
+                    }
+                }
+                // Add last string if exists
+                if (currentString.length > 2 && currentString.length < 200 && /[a-zA-Z]/.test(currentString)) {
+                    labels.push(currentString);
+                }
+            }
+            
+            // Remove duplicates and filter
+            const uniqueLabels = [...new Set(labels)].filter(l => l.length > 0 && l.length < 200);
+            
+            if (uniqueLabels.length > 0) {
+                this.lexiconLabels[label] = uniqueLabels;
+                console.log('Lexicon labels loaded:', uniqueLabels.length, 'labels for', label);
+            } else {
+                console.warn('Could not parse pickle file, labels may be empty');
+                this.lexiconLabels[label] = [];
+            }
+            
+        } catch (error) {
+            console.error('Lexicon labels upload error:', error);
+            this.showError('Error loading lexicon labels: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -1462,6 +1630,99 @@ class MotionVisualizer {
                     ctx.stroke();
                 }
             }
+        }
+    }
+
+    plotPwm() {
+        const canvas = document.getElementById('pwm-plot-canvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Check if we have hovered cell and PWM data
+        if (!this.hoveredCell) return;
+        
+        // Try to find PWM data for any loaded label (for now, use first available)
+        const labels = Object.keys(this.pwmData);
+        if (labels.length === 0) return;
+        
+        const label = labels[0]; // Use first available label
+        const pwmData = this.pwmData[label];
+        const lexiconLabels = this.lexiconLabels[label];
+        
+        if (!pwmData || !lexiconLabels) return;
+        
+        const { row, col } = this.hoveredCell;
+        const [m, n, L] = pwmData.shape;
+        
+        // Check bounds
+        if (row < 0 || row >= m || col < 0 || col >= n) return;
+        
+        // Extract values for this cell: (row, col, :)
+        // NumPy array indexing: row * (n * L) + col * L + l
+        const values = [];
+        for (let l = 0; l < L; l++) {
+            const idx = row * (n * L) + col * L + l;
+            values.push(pwmData.data[idx]);
+        }
+        
+        // Calculate ranges
+        const minVal = Math.min(...values);
+        const maxVal = Math.max(...values);
+        const range = maxVal - minVal || 1;
+        
+        // Plot dimensions
+        const margin = { top: 20, right: 20, bottom: 60, left: 40 };
+        const plotWidth = canvas.width - margin.left - margin.right;
+        const plotHeight = canvas.height - margin.top - margin.bottom;
+        
+        // Draw axes
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // X axis
+        ctx.moveTo(margin.left, canvas.height - margin.bottom);
+        ctx.lineTo(canvas.width - margin.right, canvas.height - margin.bottom);
+        // Y axis
+        ctx.moveTo(margin.left, margin.top);
+        ctx.lineTo(margin.left, canvas.height - margin.bottom);
+        ctx.stroke();
+        
+        // Draw line plot
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        
+        for (let i = 0; i < values.length; i++) {
+            const x = margin.left + (i / (values.length - 1 || 1)) * plotWidth;
+            const y = canvas.height - margin.bottom - ((values[i] - minVal) / range) * plotHeight;
+            
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+        
+        // Draw x-axis labels (vertically oriented)
+        ctx.fillStyle = '#333';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        
+        for (let i = 0; i < lexiconLabels.length && i < values.length; i++) {
+            const x = margin.left + (i / (values.length - 1 || 1)) * plotWidth;
+            const y = canvas.height - margin.bottom + 5;
+            
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText(lexiconLabels[i], 0, 0);
+            ctx.restore();
         }
     }
 
