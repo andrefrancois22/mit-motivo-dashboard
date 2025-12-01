@@ -1691,7 +1691,16 @@ class MotionVisualizer {
         ctx.lineTo(margin.left, canvas.height - margin.bottom);
         ctx.stroke();
         
-        // Draw line plot
+        // Draw x-axis ticks
+        for (let i = 0; i < values.length; i++) {
+            const x = margin.left + (i / (values.length - 1 || 1)) * plotWidth;
+            ctx.beginPath();
+            ctx.moveTo(x, canvas.height - margin.bottom);
+            ctx.lineTo(x, canvas.height - margin.bottom + 5);
+            ctx.stroke();
+        }
+        
+        // Draw line plot with markers
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1708,6 +1717,16 @@ class MotionVisualizer {
         }
         ctx.stroke();
         
+        // Draw point markers
+        ctx.fillStyle = '#000000';
+        for (let i = 0; i < values.length; i++) {
+            const x = margin.left + (i / (values.length - 1 || 1)) * plotWidth;
+            const y = canvas.height - margin.bottom - ((values[i] - minVal) / range) * plotHeight;
+            ctx.beginPath();
+            ctx.arc(x, y, 2, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+        
         // Draw x-axis labels (vertically oriented)
         ctx.fillStyle = '#333';
         ctx.font = '10px Arial';
@@ -1716,7 +1735,7 @@ class MotionVisualizer {
         
         for (let i = 0; i < lexiconLabels.length && i < values.length; i++) {
             const x = margin.left + (i / (values.length - 1 || 1)) * plotWidth;
-            const y = canvas.height - margin.bottom + 5;
+            const y = canvas.height - margin.bottom + 15;
             
             ctx.save();
             ctx.translate(x, y);
@@ -1724,6 +1743,18 @@ class MotionVisualizer {
             ctx.fillText(lexiconLabels[i], 0, 0);
             ctx.restore();
         }
+        
+        // Draw axis labels
+        ctx.fillStyle = '#333';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('lexicon', canvas.width / 2, canvas.height - 5);
+        
+        ctx.save();
+        ctx.translate(15, canvas.height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('p(w|m)', 0, 0);
+        ctx.restore();
     }
 
     async parseNumpyArray(buffer) {
