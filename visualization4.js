@@ -1675,7 +1675,7 @@ class MotionVisualizer {
         const range = maxVal - minVal || 1;
         
         // Plot dimensions
-        const margin = { top: 20, right: 20, bottom: 60, left: 40 };
+        const margin = { top: 20, right: 20, bottom: 80, left: 40 };
         const plotWidth = canvas.width - margin.left - margin.right;
         const plotHeight = canvas.height - margin.top - margin.bottom;
         
@@ -1731,11 +1731,11 @@ class MotionVisualizer {
         ctx.fillStyle = '#333';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
+        ctx.textBaseline = 'middle';
         
         for (let i = 0; i < lexiconLabels.length && i < values.length; i++) {
             const x = margin.left + (i / (values.length - 1 || 1)) * plotWidth;
-            const y = canvas.height - margin.bottom + 15;
+            const y = canvas.height - margin.bottom + 40;
             
             ctx.save();
             ctx.translate(x, y);
@@ -1748,7 +1748,7 @@ class MotionVisualizer {
         ctx.fillStyle = '#333';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('lexicon', canvas.width / 2, canvas.height - 5);
+        ctx.fillText('lexicon', canvas.width / 2, canvas.height - 10);
         
         ctx.save();
         ctx.translate(15, canvas.height / 2);
