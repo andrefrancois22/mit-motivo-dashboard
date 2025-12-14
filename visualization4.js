@@ -1344,7 +1344,7 @@ class MotionVisualizer {
         ctx.fill();
         
         // Create diagonal hatching pattern
-        ctx.strokeStyle = '#cccccc'; // Light gray for hatching
+        ctx.strokeStyle = '#999999'; // Darker gray for hatching (more distinguishable)
         ctx.lineWidth = 0.5;
         const hatchingSpacing = 4; // Spacing between diagonal lines
         
@@ -1369,7 +1369,7 @@ class MotionVisualizer {
         const plotWidth2 = plotRight - plotLeft;
         const plotHeight2 = plotBottom - plotTop;
         
-        // Draw lines from bottom-left to top-right
+        // Draw lines from top-left to bottom-right (reversed orientation: '\')
         // Calculate how many lines we need to cover the area
         const diagonalDistance = plotWidth2 + plotHeight2;
         const numLines = Math.ceil(diagonalDistance / hatchingSpacing);
@@ -1378,19 +1378,19 @@ class MotionVisualizer {
             const offset = i * hatchingSpacing;
             ctx.beginPath();
             
-            // For a 45-degree line going from bottom-left to top-right:
-            // Line equation: y = plotBottom - (x - plotLeft) + offset
-            // Or simplified: y = plotBottom + plotLeft - x + offset
+            // For a 45-degree line going from top-left to bottom-right:
+            // Line equation: y = plotTop + (x - plotLeft) + offset
+            // Or simplified: y = plotTop - plotLeft + x + offset
             
             // Find intersection points with plot boundaries
             // Left edge: x = plotLeft
-            const yAtLeft = plotBottom + offset;
+            const yAtLeft = plotTop + offset;
             // Right edge: x = plotRight  
-            const yAtRight = plotBottom + plotLeft - plotRight + offset;
+            const yAtRight = plotTop - plotLeft + plotRight + offset;
             // Top edge: y = plotTop
-            const xAtTop = plotBottom + plotLeft - plotTop + offset;
+            const xAtTop = plotLeft - offset;
             // Bottom edge: y = plotBottom
-            const xAtBottom = plotLeft + offset;
+            const xAtBottom = plotLeft + (plotBottom - plotTop) - offset;
             
             // Determine valid start and end points
             let startX = null, startY = null, endX = null, endY = null;
@@ -1399,17 +1399,17 @@ class MotionVisualizer {
             if (yAtLeft >= plotTop && yAtLeft <= plotBottom) {
                 startX = plotLeft;
                 startY = yAtLeft;
-            } else if (xAtBottom >= plotLeft && xAtBottom <= plotRight) {
-                startX = xAtBottom;
-                startY = plotBottom;
+            } else if (xAtTop >= plotLeft && xAtTop <= plotRight) {
+                startX = xAtTop;
+                startY = plotTop;
             }
             
             if (yAtRight >= plotTop && yAtRight <= plotBottom) {
                 endX = plotRight;
                 endY = yAtRight;
-            } else if (xAtTop >= plotLeft && xAtTop <= plotRight) {
-                endX = xAtTop;
-                endY = plotTop;
+            } else if (xAtBottom >= plotLeft && xAtBottom <= plotRight) {
+                endX = xAtBottom;
+                endY = plotBottom;
             }
             
             // Draw the line if we have valid endpoints
@@ -1518,14 +1518,14 @@ class MotionVisualizer {
             patternCtx.fillStyle = '#f0f0f0';
             patternCtx.fillRect(0, 0, 12, 12);
             
-            // Draw diagonal hatching
-            patternCtx.strokeStyle = '#cccccc';
+            // Draw diagonal hatching (reversed orientation: '\')
+            patternCtx.strokeStyle = '#999999'; // Darker gray to match main plot
             patternCtx.lineWidth = 0.5;
-            // Draw a few diagonal lines
+            // Draw a few diagonal lines from top-left to bottom-right
             for (let i = -12; i < 12; i += 2) {
                 patternCtx.beginPath();
-                patternCtx.moveTo(i, 0);
-                patternCtx.lineTo(i + 12, 12);
+                patternCtx.moveTo(i, 12);
+                patternCtx.lineTo(i + 12, 0);
                 patternCtx.stroke();
             }
             
