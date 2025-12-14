@@ -1325,7 +1325,102 @@ class MotionVisualizer {
         ctx.lineTo(margin, canvas.height - margin);
         ctx.stroke();
         
-
+        // Draw filled area above the curve with diagonal hatching
+        // First, fill with light gray background
+        ctx.fillStyle = '#f0f0f0'; // Light gray background
+        ctx.beginPath();
+        // Start at first point on curve
+        ctx.moveTo(scaleX(x[0]), scaleY(y[0]));
+        // Draw along the curve
+        for (let i = 1; i < x.length; i++) {
+            ctx.lineTo(scaleX(x[i]), scaleY(y[i]));
+        }
+        // Go up to top of plot area
+        ctx.lineTo(scaleX(x[x.length - 1]), margin);
+        // Go across the top
+        ctx.lineTo(scaleX(x[0]), margin);
+        // Close the path
+        ctx.closePath();
+        ctx.fill();
+        
+        // Create diagonal hatching pattern
+        ctx.strokeStyle = '#cccccc'; // Light gray for hatching
+        ctx.lineWidth = 0.5;
+        const hatchingSpacing = 4; // Spacing between diagonal lines
+        
+        // Create a clipping region for the area above the curve
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(scaleX(x[0]), scaleY(y[0]));
+        for (let i = 1; i < x.length; i++) {
+            ctx.lineTo(scaleX(x[i]), scaleY(y[i]));
+        }
+        ctx.lineTo(scaleX(x[x.length - 1]), margin);
+        ctx.lineTo(scaleX(x[0]), margin);
+        ctx.closePath();
+        ctx.clip();
+        
+        // Draw diagonal lines at 45 degrees across the entire plot area
+        // The clipping will automatically handle the boundaries
+        const plotTop = margin;
+        const plotBottom = canvas.height - margin;
+        const plotLeft = margin;
+        const plotRight = canvas.width - margin;
+        const plotWidth2 = plotRight - plotLeft;
+        const plotHeight2 = plotBottom - plotTop;
+        
+        // Draw lines from bottom-left to top-right
+        // Calculate how many lines we need to cover the area
+        const diagonalDistance = plotWidth2 + plotHeight2;
+        const numLines = Math.ceil(diagonalDistance / hatchingSpacing);
+        
+        for (let i = -numLines; i <= numLines; i++) {
+            const offset = i * hatchingSpacing;
+            ctx.beginPath();
+            
+            // For a 45-degree line going from bottom-left to top-right:
+            // Line equation: y = plotBottom - (x - plotLeft) + offset
+            // Or simplified: y = plotBottom + plotLeft - x + offset
+            
+            // Find intersection points with plot boundaries
+            // Left edge: x = plotLeft
+            const yAtLeft = plotBottom + offset;
+            // Right edge: x = plotRight  
+            const yAtRight = plotBottom + plotLeft - plotRight + offset;
+            // Top edge: y = plotTop
+            const xAtTop = plotBottom + plotLeft - plotTop + offset;
+            // Bottom edge: y = plotBottom
+            const xAtBottom = plotLeft + offset;
+            
+            // Determine valid start and end points
+            let startX = null, startY = null, endX = null, endY = null;
+            
+            // Check which edges the line intersects
+            if (yAtLeft >= plotTop && yAtLeft <= plotBottom) {
+                startX = plotLeft;
+                startY = yAtLeft;
+            } else if (xAtBottom >= plotLeft && xAtBottom <= plotRight) {
+                startX = xAtBottom;
+                startY = plotBottom;
+            }
+            
+            if (yAtRight >= plotTop && yAtRight <= plotBottom) {
+                endX = plotRight;
+                endY = yAtRight;
+            } else if (xAtTop >= plotLeft && xAtTop <= plotRight) {
+                endX = xAtTop;
+                endY = plotTop;
+            }
+            
+            // Draw the line if we have valid endpoints
+            if (startX !== null && endX !== null) {
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+            }
+        }
+        
+        ctx.restore(); // Restore clipping
         
         // Draw curve
         ctx.strokeStyle = '#000000';
@@ -1407,6 +1502,48 @@ class MotionVisualizer {
         
         // Clear existing legend
         legendSection.innerHTML = '';
+        
+        // Add hatched area legend (unachievable region)
+        if (this.curveData) {
+            const legendItem = document.createElement('div');
+            legendItem.className = 'legend-item';
+            
+            // Create a small canvas to show the hatching pattern
+            const patternCanvas = document.createElement('canvas');
+            patternCanvas.width = 12;
+            patternCanvas.height = 12;
+            const patternCtx = patternCanvas.getContext('2d');
+            
+            // Draw light gray background
+            patternCtx.fillStyle = '#f0f0f0';
+            patternCtx.fillRect(0, 0, 12, 12);
+            
+            // Draw diagonal hatching
+            patternCtx.strokeStyle = '#cccccc';
+            patternCtx.lineWidth = 0.5;
+            // Draw a few diagonal lines
+            for (let i = -12; i < 12; i += 2) {
+                patternCtx.beginPath();
+                patternCtx.moveTo(i, 0);
+                patternCtx.lineTo(i + 12, 12);
+                patternCtx.stroke();
+            }
+            
+            // Style the canvas to look like the legend circle
+            patternCanvas.style.width = '12px';
+            patternCanvas.style.height = '12px';
+            patternCanvas.style.borderRadius = '2px';
+            patternCanvas.style.border = '2px solid #ffffff';
+            patternCanvas.style.marginRight = '8px';
+            patternCanvas.style.flexShrink = '0';
+            
+            const label = document.createElement('span');
+            label.textContent = 'Unachievable region';
+            
+            legendItem.appendChild(patternCanvas);
+            legendItem.appendChild(label);
+            legendSection.appendChild(legendItem);
+        }
         
         // Add reference point legend if available
         if (this.referencePoint) {
