@@ -2052,17 +2052,22 @@ class MotionVisualizer {
             
             // Draw x-axis labels (vertically oriented)
             ctx.fillStyle = '#333';
-            ctx.font = '10px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+            ctx.font = '8px Arial'; // Reduced from 10px
+            ctx.textAlign = 'right'; // Align to right so the last letter is at a fixed position
+            ctx.textBaseline = 'alphabetic';
+            
+            // Fixed distance from tick mark to the last letter of each label
+            const labelDistance = 40;
             
             for (let i = 0; i < lexiconLabels.length && i < numTicks; i++) {
-                const x = margin.left + (i / (numTicks - 1 || 1)) * plotWidth;
-                const y = canvas.height - margin.bottom + 40;
+                const tickX = margin.left + (i / (numTicks - 1 || 1)) * plotWidth;
                 
                 ctx.save();
-                ctx.translate(x, y);
+                // Translate to the tick position, then move down by labelDistance
+                ctx.translate(tickX, canvas.height - margin.bottom + labelDistance);
                 ctx.rotate(-Math.PI / 2);
+                // With textAlign: 'right', the right edge (last letter) will be at (0, 0)
+                // After rotation, this means the last letter is at labelDistance from the tick
                 ctx.fillText(lexiconLabels[i], 0, 0);
                 ctx.restore();
             }
