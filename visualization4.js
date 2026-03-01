@@ -2057,7 +2057,7 @@ class MotionVisualizer {
             ctx.textBaseline = 'alphabetic';
             
             // Fixed distance from tick mark to the last letter of each label
-            const labelDistance = 40;
+            const labelDistance = 8; // Reduced by 80% from 40
             
             for (let i = 0; i < lexiconLabels.length && i < numTicks; i++) {
                 const tickX = margin.left + (i / (numTicks - 1 || 1)) * plotWidth;
