@@ -1084,7 +1084,9 @@ class MotionVisualizer {
     }
     
     resizeCanvasToVideoAspectRatio(videoWidth, videoHeight) {
-        const maxWidth = 800;  // Maximum canvas width
+        // Calculate max width to be 2/3 of viewport width (accounting for sidebar ~170px)
+        const availableWidth = window.innerWidth - 170; // Sidebar width + padding
+        const maxWidth = Math.floor(availableWidth * 0.67); // 2/3 of available width
         const maxHeight = 600; // Maximum canvas height
         
         // Calculate aspect ratio

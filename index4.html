@@ -39,11 +39,12 @@
         }
 
         .visualization-section {
-            flex: 3;
+            flex: 5; /* Increased from 3 to give more space */
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            max-width: 65%; /* Increased from 60% to make video larger */
+            max-width: 66.67%; /* Set to 2/3 of available space */
+            min-width: 60%; /* Ensure minimum width */
             padding-top: 5px;
         }
 
@@ -84,13 +85,13 @@
         }
 
         .graph-section {
-            flex: 2;
+            flex: 1.5; /* Reduced from 2 to give more space to visualization */
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 10px 2.5px 10px 10px; /* Reduced right padding to move closer to right margin */
-            min-width: 300px;
-            max-width: 40%;
+            min-width: 250px; /* Reduced from 300px */
+            max-width: 30%; /* Reduced from 40% */
         }
 
         .graph-section h3 {
@@ -270,6 +271,7 @@
 
         .visualization-canvas {
             background: #ffffff;
+            width: 100%; /* Ensure it uses full available width */
             max-width: 100%;
             max-height: 90vh; /* Increased from 85vh to make video larger */
         }
