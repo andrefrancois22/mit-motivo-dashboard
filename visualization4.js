@@ -323,6 +323,86 @@ class MotionVisualizer {
                 }
             });
         }
+
+        // qvel soft-dtw model bulk loader
+        const dtwBtn3 = document.getElementById('load-dtw-model-3');
+        if (dtwBtn3) {
+            dtwBtn3.addEventListener('click', async () => {
+                const statusEl = document.getElementById('dtw-model-status-3');
+                try {
+                    if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qvel-soft-dtw-0.0...';
+                    // First, try to load relative to the project (works on http/https)
+                    const loaded = await this.tryLoadDtwFromRelative3();
+                    if (loaded) {
+                        if (statusEl) statusEl.textContent = 'qvel soft-dtw model loaded from files-wr-36-qvel-soft-dtw-0.0';
+                        return;
+                    }
+                    if (window.showDirectoryPicker) {
+                        // Fallback: prompt user; hint to Desktop to quickly reach IB-results
+                        const pickerOptions = { id: 'dtw-model-3', startIn: 'desktop', mode: 'read' };
+                        let dirHandle;
+                        try {
+                            dirHandle = await window.showDirectoryPicker(pickerOptions);
+                        } catch (innerErr) {
+                            // Retry without options if not supported
+                            dirHandle = await window.showDirectoryPicker();
+                        }
+                        await this.loadDtwModelFromDirectory(dirHandle);
+                        if (statusEl) statusEl.textContent = 'qvel soft-dtw model loaded from selected directory';
+                    } else {
+                        if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
+                    }
+                } catch (e) {
+                    // User cancelled the picker is not an error; just update status quietly
+                    if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
+                        if (statusEl) statusEl.textContent = 'Cancelled folder selection';
+                        return;
+                    }
+                    console.error('DTW load error:', e);
+                    if (statusEl) statusEl.textContent = 'Failed to load qvel soft-dtw model';
+                }
+            });
+        }
+
+        // qfrc_actuator soft-dtw model bulk loader
+        const dtwBtn4 = document.getElementById('load-dtw-model-4');
+        if (dtwBtn4) {
+            dtwBtn4.addEventListener('click', async () => {
+                const statusEl = document.getElementById('dtw-model-status-4');
+                try {
+                    if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qfrc_actuator-soft-dtw-0.0...';
+                    // First, try to load relative to the project (works on http/https)
+                    const loaded = await this.tryLoadDtwFromRelative4();
+                    if (loaded) {
+                        if (statusEl) statusEl.textContent = 'qfrc_actuator soft-dtw model loaded from files-wr-36-qfrc_actuator-soft-dtw-0.0';
+                        return;
+                    }
+                    if (window.showDirectoryPicker) {
+                        // Fallback: prompt user; hint to Desktop to quickly reach IB-results
+                        const pickerOptions = { id: 'dtw-model-4', startIn: 'desktop', mode: 'read' };
+                        let dirHandle;
+                        try {
+                            dirHandle = await window.showDirectoryPicker(pickerOptions);
+                        } catch (innerErr) {
+                            // Retry without options if not supported
+                            dirHandle = await window.showDirectoryPicker();
+                        }
+                        await this.loadDtwModelFromDirectory(dirHandle);
+                        if (statusEl) statusEl.textContent = 'qfrc_actuator soft-dtw model loaded from selected directory';
+                    } else {
+                        if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
+                    }
+                } catch (e) {
+                    // User cancelled the picker is not an error; just update status quietly
+                    if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
+                        if (statusEl) statusEl.textContent = 'Cancelled folder selection';
+                        return;
+                    }
+                    console.error('DTW load error:', e);
+                    if (statusEl) statusEl.textContent = 'Failed to load qfrc_actuator soft-dtw model';
+                }
+            });
+        }
     }
 
     async loadDtwModelFromDirectory(dirHandle) {
@@ -489,6 +569,136 @@ class MotionVisualizer {
         };
         try {
             const base = 'files-wr-36-qpos-soft-dtw-0.0/';
+            const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
+            const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
+            const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
+            const curveFile = await makeFile(base + 'IB_curve.npy', 'IB_curve.npy');
+            const mdsFile = await makeFile(base + 'dtw_mds.npy', 'dtw_mds.npy');
+
+            await this.handleVideoUpload(videoFile);
+            await this.handleColorUpload(colorFile);
+            await this.handleBetaValuesUpload(betasFile);
+            await this.handleCurveValuesUpload(curveFile);
+            // Load MDS data if available (optional)
+            try {
+                await this.handleMdsUpload(mdsFile);
+            } catch (e) {
+                console.log('MDS file not available, skipping...');
+            }
+            // Try to load reference point file (optional)
+            const refPointPatterns = ['Ix_Iy_English-Psynet.npy'];
+            for (const pattern of refPointPatterns) {
+                try {
+                    const refFile = await makeFile(base + pattern, pattern);
+                    await this.handleReferencePointUpload(refFile, pattern);
+                    const label = pattern.replace('Ix_Iy_', '').replace('.npy', '');
+                    // Try to load corresponding PWM colormap
+                    const pwmPattern = `colormap_pwm_${label}.npy`;
+                    try {
+                        const pwmFile = await makeFile(base + pwmPattern, pwmPattern);
+                        await this.handlePwmColormapUpload(pwmFile, pwmPattern);
+                    } catch (e) {
+                        // PWM colormap not found, skip
+                    }
+                    // Try to load PWM data and lexicon labels
+                    try {
+                        const pwmDataFile = await makeFile(base + `pwm_${label}.npy`, `pwm_${label}.npy`);
+                        await this.handlePwmDataUpload(pwmDataFile, `pwm_${label}.npy`);
+                    } catch (e) {
+                        // PWM data not found, skip
+                    }
+                    try {
+                        const lexiconFile = await makeFile(base + `lexicon_labels_${label}.pkl`, `lexicon_labels_${label}.pkl`);
+                        await this.handleLexiconLabelsUpload(lexiconFile, `lexicon_labels_${label}.pkl`);
+                    } catch (e) {
+                        // Lexicon labels not found, skip
+                    }
+                    break;
+                } catch (e) {
+                    // Continue or skip if not found
+                }
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Try to load directly from files-wr-36-qvel-soft-dtw-0.0 directory
+    async tryLoadDtwFromRelative3() {
+        const makeFile = async (url, name) => {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('Failed to fetch ' + url);
+            const blob = await resp.blob();
+            return new File([blob], name, { type: 'application/octet-stream' });
+        };
+        try {
+            const base = 'files-wr-36-qvel-soft-dtw-0.0/';
+            const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
+            const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
+            const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
+            const curveFile = await makeFile(base + 'IB_curve.npy', 'IB_curve.npy');
+            const mdsFile = await makeFile(base + 'dtw_mds.npy', 'dtw_mds.npy');
+
+            await this.handleVideoUpload(videoFile);
+            await this.handleColorUpload(colorFile);
+            await this.handleBetaValuesUpload(betasFile);
+            await this.handleCurveValuesUpload(curveFile);
+            // Load MDS data if available (optional)
+            try {
+                await this.handleMdsUpload(mdsFile);
+            } catch (e) {
+                console.log('MDS file not available, skipping...');
+            }
+            // Try to load reference point file (optional)
+            const refPointPatterns = ['Ix_Iy_English-Psynet.npy'];
+            for (const pattern of refPointPatterns) {
+                try {
+                    const refFile = await makeFile(base + pattern, pattern);
+                    await this.handleReferencePointUpload(refFile, pattern);
+                    const label = pattern.replace('Ix_Iy_', '').replace('.npy', '');
+                    // Try to load corresponding PWM colormap
+                    const pwmPattern = `colormap_pwm_${label}.npy`;
+                    try {
+                        const pwmFile = await makeFile(base + pwmPattern, pwmPattern);
+                        await this.handlePwmColormapUpload(pwmFile, pwmPattern);
+                    } catch (e) {
+                        // PWM colormap not found, skip
+                    }
+                    // Try to load PWM data and lexicon labels
+                    try {
+                        const pwmDataFile = await makeFile(base + `pwm_${label}.npy`, `pwm_${label}.npy`);
+                        await this.handlePwmDataUpload(pwmDataFile, `pwm_${label}.npy`);
+                    } catch (e) {
+                        // PWM data not found, skip
+                    }
+                    try {
+                        const lexiconFile = await makeFile(base + `lexicon_labels_${label}.pkl`, `lexicon_labels_${label}.pkl`);
+                        await this.handleLexiconLabelsUpload(lexiconFile, `lexicon_labels_${label}.pkl`);
+                    } catch (e) {
+                        // Lexicon labels not found, skip
+                    }
+                    break;
+                } catch (e) {
+                    // Continue or skip if not found
+                }
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Try to load directly from files-wr-36-qfrc_actuator-soft-dtw-0.0 directory
+    async tryLoadDtwFromRelative4() {
+        const makeFile = async (url, name) => {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('Failed to fetch ' + url);
+            const blob = await resp.blob();
+            return new File([blob], name, { type: 'application/octet-stream' });
+        };
+        try {
+            const base = 'files-wr-36-qfrc_actuator-soft-dtw-0.0/';
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
