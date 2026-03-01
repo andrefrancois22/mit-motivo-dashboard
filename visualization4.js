@@ -49,6 +49,9 @@ class MotionVisualizer {
         // Selected directory handle for accessing videos
         this.selectedDirectoryHandle = null;
         
+        // Current data directory path (for loading videos)
+        this.currentDataDirectory = null; // e.g., 'files-wr-36-qpwr-soft-dtw-0.0/'
+        
         // WebGL resources
         this.shaderProgram = null;
         this.videoTexture = null;
@@ -485,6 +488,7 @@ class MotionVisualizer {
         };
         try {
             const base = 'files-wr-36-qpwr-soft-dtw-0.0/';
+            this.currentDataDirectory = base; // Store for video loading
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -550,6 +554,7 @@ class MotionVisualizer {
         };
         try {
             const base = 'files-wr-36-qpos-soft-dtw-0.0/';
+            this.currentDataDirectory = base; // Store for video loading
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -615,6 +620,7 @@ class MotionVisualizer {
         };
         try {
             const base = 'files-wr-36-qvel-soft-dtw-0.0/';
+            this.currentDataDirectory = base; // Store for video loading
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -680,6 +686,7 @@ class MotionVisualizer {
         };
         try {
             const base = 'files-wr-36-qfrc_actuator-soft-dtw-0.0/';
+            this.currentDataDirectory = base; // Store for video loading
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -2431,7 +2438,9 @@ class MotionVisualizer {
     loadCellVideo(row, col) {
         if (!this.cellVideo) return;
         
-        const videoPath = `files/videos/video-${row}-${col}.mp4`; //`IB-results/videos/video-${row}-${col}.mp4`;
+        // Use the current data directory if available, otherwise fall back to 'files/'
+        const baseDir = this.currentDataDirectory || 'files/';
+        const videoPath = `${baseDir}videos/video-${row}-${col}.mp4`;
         this.cellVideo.src = videoPath;
         this.cellVideo.load();
         
