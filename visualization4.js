@@ -29,7 +29,7 @@ class MotionVisualizer {
         this.isDraggingCurveSlider = false;
         
         // Animation state
-        this.isPlaying = false;
+        this.isPlaying = true; // Play by default
         this.currentFrame = 0;
         this.frameRate = 30;
         this.lastFrameTime = 0;
@@ -218,25 +218,6 @@ class MotionVisualizer {
             // this.updateColorTexture();
             // this.updateCurveSliderFromParameter();
         // });
-        
-        // Control buttons
-        document.getElementById('play-pause').addEventListener('click', () => {
-            this.togglePlayPause();
-        });
-        
-        document.getElementById('reset').addEventListener('click', () => {
-            this.resetAnimation();
-        });
-        
-        document.getElementById('zoom-in').addEventListener('click', () => {
-            this.zoom *= 1.2;
-            this.updateTransform();
-        });
-        
-        document.getElementById('zoom-out').addEventListener('click', () => {
-            this.zoom /= 1.2;
-            this.updateTransform();
-        });
         
         // Mouse controls for pan
         this.setupMouseControls();
@@ -2203,9 +2184,6 @@ class MotionVisualizer {
         // this.updateInfo('grid-size', `${m}x${n}`);
         // this.updateInfo('cell-size', `${cellWidth}x${cellHeight}`);
         
-        // Enable controls
-        this.enableControls();
-        
         // Initialize color texture if not already created
         if (!this.colorTexture) {
             this.createColorTexture();
@@ -2537,23 +2515,14 @@ class MotionVisualizer {
 
     togglePlayPause() {
         this.isPlaying = !this.isPlaying;
-        document.getElementById('play-pause').textContent = this.isPlaying ? 'Pause' : 'Play';
     }
 
     resetAnimation() {
         this.currentFrame = 0;
-        this.isPlaying = false;
+        this.isPlaying = true; // Keep playing after reset
         this.zoom = 1.0;
         this.pan = { x: 0, y: 0 };
-        document.getElementById('play-pause').textContent = 'Play';
         this.updateTransform();
-    }
-
-    enableControls() {
-        document.getElementById('play-pause').disabled = false;
-        document.getElementById('reset').disabled = false;
-        document.getElementById('zoom-in').disabled = false;
-        document.getElementById('zoom-out').disabled = false;
     }
 
     initializeUI() {
