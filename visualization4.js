@@ -921,6 +921,14 @@ class MotionVisualizer {
             this.overlayCanvas.height = newHeight;
         }
         
+        // Resize the PWM plot canvas to match the width
+        const pwmCanvas = document.getElementById('pwm-plot-canvas');
+        if (pwmCanvas) {
+            pwmCanvas.width = newWidth;
+            // Redraw the PWM plot to update axes
+            this.plotPwm();
+        }
+        
         // Update WebGL viewport to match new canvas size
         if (this.gl) {
             this.gl.viewport(0, 0, newWidth, newHeight);
@@ -1774,21 +1782,99 @@ class MotionVisualizer {
         const canvas = document.getElementById('pwm-plot-canvas');
         if (!canvas) return;
         
+        // Match the width of the visualization canvas
+        const vizCanvas = document.getElementById('visualization-canvas');
+        if (vizCanvas && canvas.width !== vizCanvas.width) {
+            canvas.width = vizCanvas.width;
+        }
+        
         const ctx = canvas.getContext('2d');
         
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Check if we have hovered cell and PWM data
-        if (!this.hoveredCell) return;
+        // Plot dimensions
+        const margin = { top: 20, right: 20, bottom: 80, left: 40 };
+        const plotWidth = canvas.width - margin.left - margin.right;
+        const plotHeight = canvas.height - margin.top - margin.bottom;
+        
+        // Always draw axes and axis labels (even when no cell is hovered)
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // X axis
+        ctx.moveTo(margin.left, canvas.height - margin.bottom);
+        ctx.lineTo(canvas.width - margin.right, canvas.height - margin.bottom);
+        // Y axis
+        ctx.moveTo(margin.left, margin.top);
+        ctx.lineTo(margin.left, canvas.height - margin.bottom);
+        ctx.stroke();
+        
+        // Draw axis labels (always visible)
+        ctx.fillStyle = '#333';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('lexicon', canvas.width / 2, canvas.height - 10);
+        
+        ctx.save();
+        ctx.translate(15, canvas.height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('p(w|m)', 0, 0);
+        ctx.restore();
         
         // Try to find PWM data for any loaded label (for now, use first available)
+        // This is needed to draw the x-axis ticks and labels even without hover
         const labels = Object.keys(this.pwmData);
+        let lexiconLabels = null;
+        let numTicks = 0;
+        
+        if (labels.length > 0) {
+            const label = labels[0]; // Use first available label
+            const pwmData = this.pwmData[label];
+            lexiconLabels = this.lexiconLabels[label];
+            
+            if (pwmData && lexiconLabels) {
+                const [m, n, L] = pwmData.shape;
+                numTicks = L;
+            }
+        }
+        
+        // Always draw x-axis ticks and labels (if we have lexicon data)
+        if (numTicks > 0 && lexiconLabels) {
+            // Draw x-axis ticks
+            for (let i = 0; i < numTicks; i++) {
+                const x = margin.left + (i / (numTicks - 1 || 1)) * plotWidth;
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height - margin.bottom);
+                ctx.lineTo(x, canvas.height - margin.bottom + 5);
+                ctx.stroke();
+            }
+            
+            // Draw x-axis labels (vertically oriented)
+            ctx.fillStyle = '#333';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            for (let i = 0; i < lexiconLabels.length && i < numTicks; i++) {
+                const x = margin.left + (i / (numTicks - 1 || 1)) * plotWidth;
+                const y = canvas.height - margin.bottom + 40;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(lexiconLabels[i], 0, 0);
+                ctx.restore();
+            }
+        }
+        
+        // Only draw data line if we have a hovered cell and PWM data
+        if (!this.hoveredCell) return;
+        
         if (labels.length === 0) return;
         
         const label = labels[0]; // Use first available label
         const pwmData = this.pwmData[label];
-        const lexiconLabels = this.lexiconLabels[label];
         
         if (!pwmData || !lexiconLabels) return;
         
@@ -1810,32 +1896,6 @@ class MotionVisualizer {
         const minVal = Math.min(...values);
         const maxVal = Math.max(...values);
         const range = maxVal - minVal || 1;
-        
-        // Plot dimensions
-        const margin = { top: 20, right: 20, bottom: 80, left: 40 };
-        const plotWidth = canvas.width - margin.left - margin.right;
-        const plotHeight = canvas.height - margin.top - margin.bottom;
-        
-        // Draw axes
-        ctx.strokeStyle = '#666';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        // X axis
-        ctx.moveTo(margin.left, canvas.height - margin.bottom);
-        ctx.lineTo(canvas.width - margin.right, canvas.height - margin.bottom);
-        // Y axis
-        ctx.moveTo(margin.left, margin.top);
-        ctx.lineTo(margin.left, canvas.height - margin.bottom);
-        ctx.stroke();
-        
-        // Draw x-axis ticks
-        for (let i = 0; i < values.length; i++) {
-            const x = margin.left + (i / (values.length - 1 || 1)) * plotWidth;
-            ctx.beginPath();
-            ctx.moveTo(x, canvas.height - margin.bottom);
-            ctx.lineTo(x, canvas.height - margin.bottom + 5);
-            ctx.stroke();
-        }
         
         // Draw line plot with markers
         ctx.strokeStyle = '#000000';
@@ -1863,35 +1923,6 @@ class MotionVisualizer {
             ctx.arc(x, y, 2, 0, 2 * Math.PI);
             ctx.fill();
         }
-        
-        // Draw x-axis labels (vertically oriented)
-        ctx.fillStyle = '#333';
-        ctx.font = '10px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        for (let i = 0; i < lexiconLabels.length && i < values.length; i++) {
-            const x = margin.left + (i / (values.length - 1 || 1)) * plotWidth;
-            const y = canvas.height - margin.bottom + 40;
-            
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(-Math.PI / 2);
-            ctx.fillText(lexiconLabels[i], 0, 0);
-            ctx.restore();
-        }
-        
-        // Draw axis labels
-        ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('lexicon', canvas.width / 2, canvas.height - 10);
-        
-        ctx.save();
-        ctx.translate(15, canvas.height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillText('p(w|m)', 0, 0);
-        ctx.restore();
     }
 
     async parseNumpyArray(buffer) {
