@@ -250,11 +250,11 @@ class MotionVisualizer {
             dtwBtn.addEventListener('click', async () => {
                 const statusEl = document.getElementById('dtw-model-status');
                 try {
-                    if (statusEl) statusEl.textContent = 'Attempting to load from IB-results/DTW-model-files...';
+                    if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qpwr-soft-dtw-0.0...';
                     // First, try to load relative to the project (works on http/https)
                     const loaded = await this.tryLoadDtwFromRelative();
                     if (loaded) {
-                        if (statusEl) statusEl.textContent = 'DTW model loaded from IB-results/DTW-model-files';
+                        if (statusEl) statusEl.textContent = 'qpwr soft-dtw model loaded from files-wr-36-qpwr-soft-dtw-0.0';
                         return;
                     }
                     if (window.showDirectoryPicker) {
@@ -268,7 +268,7 @@ class MotionVisualizer {
                             dirHandle = await window.showDirectoryPicker();
                         }
                         await this.loadDtwModelFromDirectory(dirHandle);
-                        if (statusEl) statusEl.textContent = 'DTW model loaded from selected directory';
+                        if (statusEl) statusEl.textContent = 'qpwr soft-dtw model loaded from selected directory';
                     } else {
                         if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
                     }
@@ -279,7 +279,7 @@ class MotionVisualizer {
                         return;
                     }
                     console.error('DTW load error:', e);
-                    if (statusEl) statusEl.textContent = 'Failed to load DTW model';
+                    if (statusEl) statusEl.textContent = 'Failed to load qpwr soft-dtw model';
                 }
             });
         }
@@ -290,11 +290,11 @@ class MotionVisualizer {
             dtwBtn2.addEventListener('click', async () => {
                 const statusEl = document.getElementById('dtw-model-status-2');
                 try {
-                    if (statusEl) statusEl.textContent = 'Attempting to load from files-dtw-gamma-0...';
+                    if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qpos-soft-dtw-0.0...';
                     // First, try to load relative to the project (works on http/https)
                     const loaded = await this.tryLoadDtwFromRelative2();
                     if (loaded) {
-                        if (statusEl) statusEl.textContent = 'DTW model loaded from files-dtw-gamma-0';
+                        if (statusEl) statusEl.textContent = 'qpos soft-dtw model loaded from files-wr-36-qpos-soft-dtw-0.0';
                         return;
                     }
                     if (window.showDirectoryPicker) {
@@ -308,7 +308,7 @@ class MotionVisualizer {
                             dirHandle = await window.showDirectoryPicker();
                         }
                         await this.loadDtwModelFromDirectory(dirHandle);
-                        if (statusEl) statusEl.textContent = 'DTW model loaded from selected directory';
+                        if (statusEl) statusEl.textContent = 'qpos soft-dtw model loaded from selected directory';
                     } else {
                         if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
                     }
@@ -319,7 +319,7 @@ class MotionVisualizer {
                         return;
                     }
                     console.error('DTW load error:', e);
-                    if (statusEl) statusEl.textContent = 'Failed to load DTW model';
+                    if (statusEl) statusEl.textContent = 'Failed to load qpos soft-dtw model';
                 }
             });
         }
@@ -423,7 +423,7 @@ class MotionVisualizer {
             return new File([blob], name, { type: 'application/octet-stream' });
         };
         try {
-            const base = 'files/'; //'IB-results/DTW-model-files/';
+            const base = 'files-wr-36-qpwr-soft-dtw-0.0/';
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -479,7 +479,7 @@ class MotionVisualizer {
         }
     }
 
-    // Try to load directly from files-dtw-gamma-0 directory
+    // Try to load directly from files-wr-36-qpos-soft-dtw-0.0 directory
     async tryLoadDtwFromRelative2() {
         const makeFile = async (url, name) => {
             const resp = await fetch(url);
@@ -488,7 +488,7 @@ class MotionVisualizer {
             return new File([blob], name, { type: 'application/octet-stream' });
         };
         try {
-            const base = 'files-dtw-gamma-0/';
+            const base = 'files-wr-36-qpos-soft-dtw-0.0/';
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
