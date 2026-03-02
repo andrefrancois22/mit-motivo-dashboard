@@ -2555,7 +2555,7 @@ class MotionVisualizer {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const margin = { top: 20, right: 20, bottom: 40, left: 40 };
+        const margin = { top: 20, right: 20, bottom: 60, left: 40 }; // Increased bottom margin to prevent label clipping
         const plotWidth = canvas.width - margin.left - margin.right;
         const plotHeight = canvas.height - margin.top - margin.bottom;
 
@@ -2577,7 +2577,7 @@ class MotionVisualizer {
         ctx.save();
         ctx.translate(15, canvas.height / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.fillText('p(m|w)', 0, 0);
+        ctx.fillText('p(m|w) fixed IB categories', 0, 0);
         ctx.restore();
 
         if (!this.pmwLinesData || this.pmwLinesData.length === 0) {
@@ -2642,6 +2642,7 @@ class MotionVisualizer {
                 const maxTicks = Math.min(20, numPoints); // Show at most 20 ticks
                 const tickStep = Math.max(1, Math.floor(numPoints / maxTicks));
                 
+                // Start from index 0 to include the origin
                 for (let i = 0; i < numPoints; i += tickStep) {
                     const x = scaleX(i, numPoints);
                     
@@ -2656,8 +2657,30 @@ class MotionVisualizer {
                     if (label) {
                         // Rotate label for better readability
                         ctx.save();
-                        ctx.translate(x, canvas.height - margin.bottom + 20);
+                        ctx.translate(x, canvas.height - margin.bottom + 25); // Increased offset to prevent clipping
                         ctx.rotate(-Math.PI / 4); // 45 degrees
+                        ctx.fillText(label, 0, 0);
+                        ctx.restore();
+                    }
+                }
+                
+                // Always show the last label if it's not already included
+                if (numPoints > 1 && (numPoints - 1) % tickStep !== 0) {
+                    const lastIdx = numPoints - 1;
+                    const x = scaleX(lastIdx, numPoints);
+                    
+                    // Draw tick mark
+                    ctx.beginPath();
+                    ctx.moveTo(x, canvas.height - margin.bottom);
+                    ctx.lineTo(x, canvas.height - margin.bottom + 5);
+                    ctx.stroke();
+                    
+                    // Draw label
+                    const label = videoFileNames[lastIdx];
+                    if (label) {
+                        ctx.save();
+                        ctx.translate(x, canvas.height - margin.bottom + 25);
+                        ctx.rotate(-Math.PI / 4);
                         ctx.fillText(label, 0, 0);
                         ctx.restore();
                     }
