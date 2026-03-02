@@ -51,6 +51,7 @@ class MotionVisualizer {
         
         // Current data directory path (for loading videos)
         this.currentDataDirectory = null; // e.g., 'files-wr-36-qpwr-soft-dtw-0.0/'
+        this.pmwLinesData = null; // Array of arrays containing line data for current beta
         
         // WebGL resources
         this.shaderProgram = null;
@@ -390,6 +391,9 @@ class MotionVisualizer {
     }
 
     async loadDtwModelFromDirectory(dirHandle) {
+        // Store the directory handle for later use (e.g., loading pmw files)
+        this.selectedDirectoryHandle = dirHandle;
+        
         const readFile = async (name) => {
             for await (const entry of dirHandle.values()) {
                 if (entry.kind === 'file' && entry.name === name) {
@@ -896,8 +900,12 @@ class MotionVisualizer {
         this.updateColorTexture();
         this.updateLegend();
         
+        // Load and update pmw lines data for new beta index
+        this.loadPmwLinesData(this.currentParameter);
+        
         // Redraw the curve with the updated circle position
         this.plotCurve();
+        this.plotPwm(); // Also update PWM plot
     }
     
     updateCurveSliderFromParameter() {
@@ -909,6 +917,9 @@ class MotionVisualizer {
         // Map parameter value to curve position
         const normalizedParameter = this.currentParameter / (parameterRange - 1);
         this.curveSliderPosition = Math.floor(normalizedParameter * (x.length - 1));
+        
+        // Load and update pmw lines data for new beta index
+        this.loadPmwLinesData(this.currentParameter);
         
         // Redraw the curve with the updated circle position
         this.plotCurve();
@@ -1127,6 +1138,14 @@ class MotionVisualizer {
             pwmCanvas.width = newWidth;
             // Redraw the PWM plot to update axes
             this.plotPwm();
+        }
+        
+        // Resize the PMW lines plot canvas to match the width
+        const pmwLinesCanvas = document.getElementById('pmw-lines-plot-canvas');
+        if (pmwLinesCanvas) {
+            pmwLinesCanvas.width = newWidth;
+            // Redraw the PMW lines plot to update axes
+            this.plotPmwLines();
         }
         
         // Update WebGL viewport to match new canvas size
@@ -2173,6 +2192,321 @@ class MotionVisualizer {
         }
         
         return { data, shape, dtype };
+    }
+
+    async parseNumpyArrayWithPickle(buffer) {
+        // Parse numpy array that may contain pickled Python objects (like lists of arrays)
+        const dataView = new DataView(buffer);
+        
+        // Check magic number
+        const magic = new Uint8Array(buffer, 0, 6);
+        const magicString = String.fromCharCode(...magic);
+        
+        if (magicString !== '\x93NUMPY') {
+            throw new Error('Not a valid numpy file');
+        }
+        
+        // Read header
+        const headerLen = dataView.getUint16(8, true);
+        const headerBytes = new Uint8Array(buffer, 10, headerLen);
+        const header = String.fromCharCode(...headerBytes);
+        
+        // Check if it contains pickle data
+        const hasPickle = header.includes("'allow_pickle': True") || header.includes("'allow_pickle':True");
+        const shapeMatch = header.match(/'shape':\s*\(([^)]+)\)/);
+        const dtypeMatch = header.match(/'descr':\s*'([^']+)'/);
+        
+        if (!shapeMatch || !dtypeMatch) {
+            throw new Error('Unable to parse numpy header');
+        }
+        
+        const shape = shapeMatch[1].split(',').map(s => s.trim()).filter(s => s.length > 0).map(s => parseInt(s));
+        const dtype = dtypeMatch[1];
+        
+        // Read data
+        const dataOffset = 10 + headerLen;
+        
+        // If it's object dtype with pickle, we need to parse the pickle data
+        if (hasPickle || dtype.includes('O') || dtype.includes('object')) {
+            // For now, return the raw buffer and let the caller handle it
+            // We'll need to parse the pickle format manually
+            const dataBytes = new Uint8Array(buffer, dataOffset);
+            return { data: dataBytes, shape, dtype, isPickle: true, buffer: buffer, dataOffset: dataOffset };
+        } else {
+            // Regular array parsing
+            let data;
+            if (dtype.includes('f4')) {
+                data = new Float32Array(buffer, dataOffset);
+            } else if (dtype.includes('f8')) {
+                data = new Float64Array(buffer, dataOffset);
+            } else if (dtype.includes('u1')) {
+                data = new Uint8Array(buffer, dataOffset);
+            } else {
+                throw new Error('Unsupported data type: ' + dtype);
+            }
+            return { data, shape, dtype, isPickle: false };
+        }
+    }
+
+    async loadPmwLinesData(betaIndex) {
+        if (!this.currentDataDirectory) {
+            console.log('No data directory set, cannot load pmw lines data');
+            this.pmwLinesData = null;
+            this.plotPmwLines();
+            return;
+        }
+
+        try {
+            const filename = `pmw_beta_${betaIndex}_lines.npy`;
+            
+            let file = null;
+            
+            // Try to load using directory handle first (works with file:// protocol)
+            if (this.selectedDirectoryHandle) {
+                try {
+                    // Navigate to the pmw_data subdirectory
+                    const pmwDataDir = await this.selectedDirectoryHandle.getDirectoryHandle('pmw_data');
+                    file = await pmwDataDir.getFileHandle(filename).then(h => h.getFile());
+                    console.log('Loaded pmw lines data using directory handle');
+                } catch (e) {
+                    console.log('Could not load from directory handle, trying fetch:', e.message);
+                    // Fall through to fetch method
+                }
+            }
+            
+            // If directory handle method didn't work, try fetch (works with HTTP/HTTPS)
+            if (!file) {
+                // Check if we're on file:// protocol - fetch won't work
+                if (window.location.protocol === 'file:') {
+                    // On file://, we can't use fetch, so we can't load the file
+                    // This is expected - the user needs to either use a web server or select a directory
+                    throw new Error('Cannot load files via fetch on file:// protocol. Please serve the files over HTTP/HTTPS or use directory selection.');
+                }
+                
+                // Ensure proper path construction - remove trailing slash from currentDataDirectory if present
+                const baseDir = this.currentDataDirectory.endsWith('/') 
+                    ? this.currentDataDirectory.slice(0, -1) 
+                    : this.currentDataDirectory;
+                const filepath = `${baseDir}/pmw_data/${filename}`;
+                
+                console.log('Loading pmw lines data from:', filepath);
+                
+                try {
+                    const response = await fetch(filepath);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${filepath}: ${response.status} ${response.statusText}`);
+                    }
+                    const blob = await response.blob();
+                    file = new File([blob], filename, { type: 'application/octet-stream' });
+                } catch (fetchError) {
+                    // If fetch fails, it might be a CORS issue or file not found
+                    throw new Error(`Failed to load pmw lines data: ${fetchError.message}. Make sure you're serving the files over HTTP/HTTPS, not opening the HTML file directly.`);
+                }
+            }
+            const buffer = await file.arrayBuffer();
+            
+            // Try to parse as numpy array with pickle support
+            const parsed = await this.parseNumpyArrayWithPickle(buffer);
+            
+            if (parsed.isPickle) {
+                // Parse pickle format - this is a simplified parser for lists of numpy arrays
+                // The pickle format stores Python objects, and a list of arrays will be stored
+                // as a sequence of array data structures
+                console.log('Parsing pickle format for pmw lines data');
+                
+                // For now, try to extract arrays from the pickle data
+                // This is a simplified approach - full pickle parsing is complex
+                const arrays = await this.parsePickledArrays(parsed.buffer, parsed.dataOffset);
+                this.pmwLinesData = arrays;
+                console.log(`Loaded ${arrays.length} arrays from pmw lines data`);
+            } else {
+                // Regular array - convert to list of arrays based on shape
+                console.log('Parsing regular numpy array format');
+                const arrays = this.convertArrayToLineArrays(parsed.data, parsed.shape);
+                this.pmwLinesData = arrays;
+                console.log(`Converted to ${arrays.length} line arrays`);
+            }
+            
+            // Plot the data
+            this.plotPmwLines();
+            
+        } catch (error) {
+            // Check if it's a "file not found" error - this is expected if the file doesn't exist
+            const isNotFound = error.message.includes('Failed to fetch') || 
+                              error.message.includes('404') ||
+                              error.message.includes('not found') ||
+                              error.message.includes('File not found');
+            
+            if (isNotFound) {
+                // File doesn't exist - this is okay, just log at debug level
+                console.log(`pmw lines data file not found for beta ${betaIndex} (this is okay if the file doesn't exist)`);
+            } else {
+                // Other error - log as warning
+                console.warn('Error loading pmw lines data for beta index', betaIndex, ':', error.message);
+                console.warn('File path attempted:', `${this.currentDataDirectory}pmw_data/pmw_beta_${betaIndex}_lines.npy`);
+            }
+            this.pmwLinesData = null;
+            this.plotPmwLines(); // Still plot (empty) to clear previous data
+        }
+    }
+
+    async parsePickledArrays(buffer, dataOffset) {
+        // Simplified pickle parser for lists of numpy arrays
+        // This is a basic implementation - may need refinement based on actual data format
+        const arrays = [];
+        const bytes = new Uint8Array(buffer, dataOffset);
+        
+        // Look for numpy array markers in the pickle data
+        // Pickle format uses specific opcodes, but we'll look for numpy array signatures
+        let i = 0;
+        while (i < bytes.length - 10) {
+            // Look for numpy magic number '\x93NUMPY'
+            if (bytes[i] === 0x93 && bytes[i+1] === 0x4E && bytes[i+2] === 0x55 && 
+                bytes[i+3] === 0x4D && bytes[i+4] === 0x50 && bytes[i+5] === 0x59) {
+                try {
+                    // Found a numpy array, try to parse it
+                    const arrayBuffer = buffer.slice(dataOffset + i);
+                    const parsed = await this.parseNumpyArray(arrayBuffer);
+                    const values = Array.from(parsed.data);
+                    arrays.push(values);
+                    // Skip past this array (approximate)
+                    const headerLen = new DataView(buffer, dataOffset + i + 8).getUint16(0, true);
+                    const arraySize = parsed.data.length * (parsed.dtype.includes('f8') ? 8 : 4);
+                    i += 10 + headerLen + arraySize;
+                } catch (e) {
+                    i++;
+                }
+            } else {
+                i++;
+            }
+        }
+        
+        // If we didn't find arrays using the above method, try a different approach
+        // The pickle format might store the arrays differently
+        if (arrays.length === 0) {
+            console.warn('Could not parse pickle format, trying alternative method');
+            // Try to find arrays by looking for repeated patterns or structure
+            // For now, return empty - may need to implement full pickle parser
+        }
+        
+        return arrays;
+    }
+
+    convertArrayToLineArrays(data, shape) {
+        // Convert a numpy array to a list of line arrays
+        // If shape is (num_lines, num_points), return array of arrays
+        const arrays = [];
+        
+        if (shape.length === 1) {
+            // Single array - return as single line
+            arrays.push(Array.from(data));
+        } else if (shape.length === 2) {
+            // 2D array - each row is a line
+            const [numLines, numPoints] = shape;
+            for (let i = 0; i < numLines; i++) {
+                const lineData = [];
+                for (let j = 0; j < numPoints; j++) {
+                    lineData.push(data[i * numPoints + j]);
+                }
+                arrays.push(lineData);
+            }
+        } else {
+            console.warn('Unexpected shape for pmw lines data:', shape);
+        }
+        
+        return arrays;
+    }
+
+    plotPmwLines() {
+        const canvas = document.getElementById('pmw-lines-plot-canvas');
+        if (!canvas) {
+            console.log('pmw-lines-plot-canvas not found');
+            return;
+        }
+
+        // Match width with pwm plot canvas
+        const pwmCanvas = document.getElementById('pwm-plot-canvas');
+        if (pwmCanvas && canvas.width !== pwmCanvas.width) {
+            canvas.width = pwmCanvas.width;
+        }
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const margin = { top: 20, right: 20, bottom: 40, left: 40 };
+        const plotWidth = canvas.width - margin.left - margin.right;
+        const plotHeight = canvas.height - margin.top - margin.bottom;
+
+        // Draw axes
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(margin.left, canvas.height - margin.bottom);
+        ctx.lineTo(canvas.width - margin.right, canvas.height - margin.bottom);
+        ctx.moveTo(margin.left, margin.top);
+        ctx.lineTo(margin.left, canvas.height - margin.bottom);
+        ctx.stroke();
+
+        // Draw axis labels
+        ctx.fillStyle = '#333';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Index', canvas.width / 2, canvas.height - 10);
+        ctx.save();
+        ctx.translate(15, canvas.height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Value', 0, 0);
+        ctx.restore();
+
+        if (!this.pmwLinesData || this.pmwLinesData.length === 0) {
+            // No data - just show axes
+            return;
+        }
+
+        // Find global min/max across all lines for scaling
+        let globalMin = Infinity;
+        let globalMax = -Infinity;
+        for (const line of this.pmwLinesData) {
+            if (line && line.length > 0) {
+                const lineMin = Math.min(...line);
+                const lineMax = Math.max(...line);
+                globalMin = Math.min(globalMin, lineMin);
+                globalMax = Math.max(globalMax, lineMax);
+            }
+        }
+
+        if (globalMin === Infinity || globalMax === -Infinity) {
+            return; // No valid data
+        }
+
+        const valueRange = globalMax - globalMin || 1;
+        const scaleX = (idx, length) => margin.left + (idx / (length - 1 || 1)) * plotWidth;
+        const scaleY = (val) => canvas.height - margin.bottom - ((val - globalMin) / valueRange) * plotHeight;
+
+        // Draw each line with a different color
+        const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+        
+        for (let lineIdx = 0; lineIdx < this.pmwLinesData.length; lineIdx++) {
+            const line = this.pmwLinesData[lineIdx];
+            if (!line || line.length === 0) continue;
+
+            const color = colors[lineIdx % colors.length];
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+
+            for (let i = 0; i < line.length; i++) {
+                const x = scaleX(i, line.length);
+                const y = scaleY(line[i]);
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+        }
     }
 
     calculateGridInfo() {
