@@ -2610,12 +2610,12 @@ class MotionVisualizer {
             n = this.gridInfo.grid_dimensions[1];
         }
         
-        // Generate video file names for x-axis labels
+        // Generate video file names for x-axis labels (without .mp4 extension)
         const videoFileNames = [];
         if (m > 0 && n > 0) {
             for (let row = 0; row < m; row++) {
                 for (let col = 0; col < n; col++) {
-                    videoFileNames.push(`video-${row}-${col}.mp4`);
+                    videoFileNames.push(`video-${row}-${col}`);
                 }
             }
         }
@@ -2656,7 +2656,7 @@ class MotionVisualizer {
                     if (label) {
                         // Rotate label for better readability
                         ctx.save();
-                        ctx.translate(x, canvas.height - margin.bottom + 10);
+                        ctx.translate(x, canvas.height - margin.bottom + 20);
                         ctx.rotate(-Math.PI / 4); // 45 degrees
                         ctx.fillText(label, 0, 0);
                         ctx.restore();
