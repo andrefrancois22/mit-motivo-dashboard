@@ -2610,12 +2610,12 @@ class MotionVisualizer {
             n = this.gridInfo.grid_dimensions[1];
         }
         
-        // Generate video file names for x-axis labels (without .mp4 extension)
+        // Generate video file names for x-axis labels (without 'video' prefix and .mp4 extension)
         const videoFileNames = [];
         if (m > 0 && n > 0) {
             for (let row = 0; row < m; row++) {
                 for (let col = 0; col < n; col++) {
-                    videoFileNames.push(`video-${row}-${col}`);
+                    videoFileNames.push(`${row}-${col}`);
                 }
             }
         }
@@ -2652,13 +2652,14 @@ class MotionVisualizer {
                     ctx.lineTo(x, canvas.height - margin.bottom + 5);
                     ctx.stroke();
                     
-                    // Draw label (rotated if needed)
+                    // Draw label vertically
                     const label = videoFileNames[i];
                     if (label) {
-                        // Rotate label for better readability
                         ctx.save();
-                        ctx.translate(x, canvas.height - margin.bottom + 25); // Increased offset to prevent clipping
-                        ctx.rotate(-Math.PI / 4); // 45 degrees
+                        ctx.translate(x, canvas.height - margin.bottom + 25);
+                        ctx.rotate(-Math.PI / 2); // 90 degrees (vertical)
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
                         ctx.fillText(label, 0, 0);
                         ctx.restore();
                     }
@@ -2675,12 +2676,14 @@ class MotionVisualizer {
                     ctx.lineTo(x, canvas.height - margin.bottom + 5);
                     ctx.stroke();
                     
-                    // Draw label
+                    // Draw label vertically
                     const label = videoFileNames[lastIdx];
                     if (label) {
                         ctx.save();
                         ctx.translate(x, canvas.height - margin.bottom + 25);
-                        ctx.rotate(-Math.PI / 4);
+                        ctx.rotate(-Math.PI / 2); // 90 degrees (vertical)
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
                         ctx.fillText(label, 0, 0);
                         ctx.restore();
                     }
