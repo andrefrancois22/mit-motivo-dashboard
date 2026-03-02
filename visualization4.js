@@ -52,6 +52,7 @@ class MotionVisualizer {
         // Current data directory path (for loading videos)
         this.currentDataDirectory = null; // e.g., 'files-wr-36-qpwr-soft-dtw-0.0/'
         this.pmwLinesData = null; // Array of arrays containing line data for current beta
+        this.pmwLinesColors = null; // Array of RGB triplets [r, g, b] for each line
         
         // WebGL resources
         this.shaderProgram = null;
@@ -2327,6 +2328,9 @@ class MotionVisualizer {
                 console.log(`Converted to ${arrays.length} line arrays`);
             }
             
+            // Now load the corresponding RGB colors
+            await this.loadPmwLinesColors(betaIndex);
+            
             // Plot the data
             this.plotPmwLines();
             
@@ -2346,7 +2350,125 @@ class MotionVisualizer {
                 console.warn('File path attempted:', `${this.currentDataDirectory}pmw_data/pmw_beta_${betaIndex}_lines.npy`);
             }
             this.pmwLinesData = null;
+            this.pmwLinesColors = null;
             this.plotPmwLines(); // Still plot (empty) to clear previous data
+        }
+    }
+
+    async loadPmwLinesColors(betaIndex) {
+        if (!this.currentDataDirectory) {
+            this.pmwLinesColors = null;
+            return;
+        }
+
+        try {
+            const filename = `pmw_beta_${betaIndex}_rgb.npy`;
+            
+            let file = null;
+            
+            // Try to load using directory handle first (works with file:// protocol)
+            if (this.selectedDirectoryHandle) {
+                try {
+                    // Navigate to the pmw_rgbs subdirectory
+                    const pmwRgbsDir = await this.selectedDirectoryHandle.getDirectoryHandle('pmw_rgbs');
+                    file = await pmwRgbsDir.getFileHandle(filename).then(h => h.getFile());
+                    console.log('Loaded pmw RGB colors using directory handle');
+                } catch (e) {
+                    console.log('Could not load RGB colors from directory handle, trying fetch:', e.message);
+                    // Fall through to fetch method
+                }
+            }
+            
+            // If directory handle method didn't work, try fetch (works with HTTP/HTTPS)
+            if (!file) {
+                // Check if we're on file:// protocol - fetch won't work
+                if (window.location.protocol === 'file:') {
+                    // On file://, we can't use fetch, so we can't load the file
+                    this.pmwLinesColors = null;
+                    return;
+                }
+                
+                // Ensure proper path construction - remove trailing slash from currentDataDirectory if present
+                const baseDir = this.currentDataDirectory.endsWith('/') 
+                    ? this.currentDataDirectory.slice(0, -1) 
+                    : this.currentDataDirectory;
+                const filepath = `${baseDir}/pmw_rgbs/${filename}`;
+                
+                console.log('Loading pmw RGB colors from:', filepath);
+                
+                try {
+                    const response = await fetch(filepath);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${filepath}: ${response.status} ${response.statusText}`);
+                    }
+                    const blob = await response.blob();
+                    file = new File([blob], filename, { type: 'application/octet-stream' });
+                } catch (fetchError) {
+                    // If fetch fails, RGB file might not exist - that's okay
+                    console.log('RGB colors file not found, using default colors');
+                    this.pmwLinesColors = null;
+                    return;
+                }
+            }
+            
+            const buffer = await file.arrayBuffer();
+            const parsed = await this.parseNumpyArray(buffer);
+            
+            // Parse RGB array - should be shape (num_lines, 3) or (3, num_lines)
+            let rgbColors = [];
+            
+            if (parsed.shape.length === 2) {
+                if (parsed.shape[1] === 3) {
+                    // Format: (num_lines, 3) - each row is an RGB triplet
+                    const numLines = parsed.shape[0];
+                    const dataArray = Array.from(parsed.data);
+                    
+                    for (let i = 0; i < numLines; i++) {
+                        const r = dataArray[i * 3];
+                        const g = dataArray[i * 3 + 1];
+                        const b = dataArray[i * 3 + 2];
+                        
+                        // Check if values are in 0-1 range and multiply by 255 if needed
+                        const rVal = r <= 1.0 ? Math.round(r * 255) : Math.round(r);
+                        const gVal = g <= 1.0 ? Math.round(g * 255) : Math.round(g);
+                        const bVal = b <= 1.0 ? Math.round(b * 255) : Math.round(b);
+                        
+                        rgbColors.push([rVal, gVal, bVal]);
+                    }
+                } else if (parsed.shape[0] === 3) {
+                    // Format: (3, num_lines) - RGB as separate rows
+                    const numLines = parsed.shape[1];
+                    const dataArray = Array.from(parsed.data);
+                    
+                    for (let i = 0; i < numLines; i++) {
+                        const r = dataArray[i];
+                        const g = dataArray[i + numLines];
+                        const b = dataArray[i + numLines * 2];
+                        
+                        // Check if values are in 0-1 range and multiply by 255 if needed
+                        const rVal = r <= 1.0 ? Math.round(r * 255) : Math.round(r);
+                        const gVal = g <= 1.0 ? Math.round(g * 255) : Math.round(g);
+                        const bVal = b <= 1.0 ? Math.round(b * 255) : Math.round(b);
+                        
+                        rgbColors.push([rVal, gVal, bVal]);
+                    }
+                } else {
+                    console.warn('Unexpected RGB array shape:', parsed.shape);
+                    this.pmwLinesColors = null;
+                    return;
+                }
+            } else {
+                console.warn('Unexpected RGB array dimensions:', parsed.shape);
+                this.pmwLinesColors = null;
+                return;
+            }
+            
+            this.pmwLinesColors = rgbColors;
+            console.log(`Loaded ${rgbColors.length} RGB color triplets`);
+            
+        } catch (error) {
+            console.log('Error loading pmw RGB colors:', error.message);
+            this.pmwLinesColors = null;
         }
     }
 
@@ -2483,14 +2605,22 @@ class MotionVisualizer {
         const scaleX = (idx, length) => margin.left + (idx / (length - 1 || 1)) * plotWidth;
         const scaleY = (val) => canvas.height - margin.bottom - ((val - globalMin) / valueRange) * plotHeight;
 
-        // Draw each line with a different color
-        const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+        // Draw each line with colors from RGB data or default colors
+        const defaultColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
         
         for (let lineIdx = 0; lineIdx < this.pmwLinesData.length; lineIdx++) {
             const line = this.pmwLinesData[lineIdx];
             if (!line || line.length === 0) continue;
 
-            const color = colors[lineIdx % colors.length];
+            // Use RGB colors if available, otherwise use default colors
+            let color;
+            if (this.pmwLinesColors && this.pmwLinesColors.length > lineIdx) {
+                const [r, g, b] = this.pmwLinesColors[lineIdx];
+                color = `rgb(${r}, ${g}, ${b})`;
+            } else {
+                color = defaultColors[lineIdx % defaultColors.length];
+            }
+            
             ctx.strokeStyle = color;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
