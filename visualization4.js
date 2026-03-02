@@ -2573,11 +2573,11 @@ class MotionVisualizer {
         ctx.fillStyle = '#333';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('Index', canvas.width / 2, canvas.height - 10);
+        ctx.fillText('Video File', canvas.width / 2, canvas.height - 10);
         ctx.save();
         ctx.translate(15, canvas.height / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.fillText('Value', 0, 0);
+        ctx.fillText('p(m|w)', 0, 0);
         ctx.restore();
 
         if (!this.pmwLinesData || this.pmwLinesData.length === 0) {
@@ -2601,9 +2601,69 @@ class MotionVisualizer {
             return; // No valid data
         }
 
+        // Get grid dimensions to generate video file names
+        let m = 0, n = 0;
+        if (this.colorGridData) {
+            [m, n] = this.colorGridData.shape;
+        } else if (this.gridInfo) {
+            m = this.gridInfo.grid_dimensions[0];
+            n = this.gridInfo.grid_dimensions[1];
+        }
+        
+        // Generate video file names for x-axis labels
+        const videoFileNames = [];
+        if (m > 0 && n > 0) {
+            for (let row = 0; row < m; row++) {
+                for (let col = 0; col < n; col++) {
+                    videoFileNames.push(`video-${row}-${col}.mp4`);
+                }
+            }
+        }
+
         const valueRange = globalMax - globalMin || 1;
         const scaleX = (idx, length) => margin.left + (idx / (length - 1 || 1)) * plotWidth;
         const scaleY = (val) => canvas.height - margin.bottom - ((val - globalMin) / valueRange) * plotHeight;
+        
+        // Draw x-axis tick labels with video file names
+        if (this.pmwLinesData && this.pmwLinesData.length > 0) {
+            const firstLine = this.pmwLinesData[0];
+            const numPoints = firstLine ? firstLine.length : 0;
+            
+            if (numPoints > 0 && videoFileNames.length === numPoints) {
+                // Draw tick marks and labels
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 1;
+                ctx.fillStyle = '#333';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                
+                // Determine how many ticks to show (avoid overcrowding)
+                const maxTicks = Math.min(20, numPoints); // Show at most 20 ticks
+                const tickStep = Math.max(1, Math.floor(numPoints / maxTicks));
+                
+                for (let i = 0; i < numPoints; i += tickStep) {
+                    const x = scaleX(i, numPoints);
+                    
+                    // Draw tick mark
+                    ctx.beginPath();
+                    ctx.moveTo(x, canvas.height - margin.bottom);
+                    ctx.lineTo(x, canvas.height - margin.bottom + 5);
+                    ctx.stroke();
+                    
+                    // Draw label (rotated if needed)
+                    const label = videoFileNames[i];
+                    if (label) {
+                        // Rotate label for better readability
+                        ctx.save();
+                        ctx.translate(x, canvas.height - margin.bottom + 10);
+                        ctx.rotate(-Math.PI / 4); // 45 degrees
+                        ctx.fillText(label, 0, 0);
+                        ctx.restore();
+                    }
+                }
+            }
+        }
 
         // Draw each line with colors from RGB data or default colors
         const defaultColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
