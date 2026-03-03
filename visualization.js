@@ -483,8 +483,24 @@ class MotionVisualizer {
         }
     }
 
+    // Get the base path for GitHub Pages (e.g., '/repo-name/' or '/')
+    getBasePath() {
+        let pathname = window.location.pathname;
+        // Remove filename if present (e.g., 'index.html')
+        if (pathname.includes('/') && !pathname.endsWith('/')) {
+            // Extract directory path (everything up to and including the last '/')
+            pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+        }
+        // Ensure it ends with a slash (handles root case where pathname is '/')
+        if (!pathname.endsWith('/')) {
+            pathname += '/';
+        }
+        return pathname;
+    }
+
     // Try to load directly from project-relative directory (works when served over http/https). Falls back silently on file://
     async tryLoadDtwFromRelative() {
+        const basePath = this.getBasePath();
         const makeFile = async (url, name) => {
             const resp = await fetch(url);
             if (!resp.ok) throw new Error('Failed to fetch ' + url);
@@ -492,8 +508,8 @@ class MotionVisualizer {
             return new File([blob], name, { type: 'application/octet-stream' });
         };
         try {
-            const base = 'files-wr-36-qpwr-soft-dtw-0.0/';
-            this.currentDataDirectory = base; // Store for video loading
+            const base = basePath + 'files-wr-36-qpwr-soft-dtw-0.0/';
+            this.currentDataDirectory = 'files-wr-36-qpwr-soft-dtw-0.0/'; // Store relative path for video loading
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -551,6 +567,7 @@ class MotionVisualizer {
 
     // Try to load directly from files-wr-36-qpos-soft-dtw-0.0 directory
     async tryLoadDtwFromRelative2() {
+        const basePath = this.getBasePath();
         const makeFile = async (url, name) => {
             const resp = await fetch(url);
             if (!resp.ok) throw new Error('Failed to fetch ' + url);
@@ -558,8 +575,8 @@ class MotionVisualizer {
             return new File([blob], name, { type: 'application/octet-stream' });
         };
         try {
-            const base = 'files-wr-36-qpos-soft-dtw-0.0/';
-            this.currentDataDirectory = base; // Store for video loading
+            const base = basePath + 'files-wr-36-qpos-soft-dtw-0.0/';
+            this.currentDataDirectory = 'files-wr-36-qpos-soft-dtw-0.0/'; // Store relative path for video loading
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -617,6 +634,7 @@ class MotionVisualizer {
 
     // Try to load directly from files-wr-36-qvel-soft-dtw-0.0 directory
     async tryLoadDtwFromRelative3() {
+        const basePath = this.getBasePath();
         const makeFile = async (url, name) => {
             const resp = await fetch(url);
             if (!resp.ok) throw new Error('Failed to fetch ' + url);
@@ -624,8 +642,8 @@ class MotionVisualizer {
             return new File([blob], name, { type: 'application/octet-stream' });
         };
         try {
-            const base = 'files-wr-36-qvel-soft-dtw-0.0/';
-            this.currentDataDirectory = base; // Store for video loading
+            const base = basePath + 'files-wr-36-qvel-soft-dtw-0.0/';
+            this.currentDataDirectory = 'files-wr-36-qvel-soft-dtw-0.0/'; // Store relative path for video loading
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -683,6 +701,7 @@ class MotionVisualizer {
 
     // Try to load directly from files-wr-36-qfrc_actuator-soft-dtw-0.0 directory
     async tryLoadDtwFromRelative4() {
+        const basePath = this.getBasePath();
         const makeFile = async (url, name) => {
             const resp = await fetch(url);
             if (!resp.ok) throw new Error('Failed to fetch ' + url);
@@ -690,8 +709,8 @@ class MotionVisualizer {
             return new File([blob], name, { type: 'application/octet-stream' });
         };
         try {
-            const base = 'files-wr-36-qfrc_actuator-soft-dtw-0.0/';
-            this.currentDataDirectory = base; // Store for video loading
+            const base = basePath + 'files-wr-36-qfrc_actuator-soft-dtw-0.0/';
+            this.currentDataDirectory = 'files-wr-36-qfrc_actuator-soft-dtw-0.0/'; // Store relative path for video loading
             const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
             const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
             const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
@@ -2288,7 +2307,8 @@ class MotionVisualizer {
                 const baseDir = this.currentDataDirectory.endsWith('/') 
                     ? this.currentDataDirectory.slice(0, -1) 
                     : this.currentDataDirectory;
-                const filepath = `${baseDir}/pmw_data/${filename}`;
+                const basePath = this.getBasePath();
+                const filepath = basePath + `${baseDir}/pmw_data/${filename}`;
                 
                 console.log('Loading pmw lines data from:', filepath);
                 
@@ -2392,7 +2412,8 @@ class MotionVisualizer {
                 const baseDir = this.currentDataDirectory.endsWith('/') 
                     ? this.currentDataDirectory.slice(0, -1) 
                     : this.currentDataDirectory;
-                const filepath = `${baseDir}/pmw_rgbs/${filename}`;
+                const basePath = this.getBasePath();
+                const filepath = basePath + `${baseDir}/pmw_rgbs/${filename}`;
                 
                 console.log('Loading pmw RGB colors from:', filepath);
                 
@@ -2995,7 +3016,8 @@ class MotionVisualizer {
         
         // Use the current data directory if available, otherwise fall back to 'files/'
         const baseDir = this.currentDataDirectory || 'files/';
-        const videoPath = `${baseDir}videos/video-${row}-${col}.mp4`;
+        const basePath = this.getBasePath();
+        const videoPath = basePath + `${baseDir}videos/video-${row}-${col}.mp4`;
         this.cellVideo.src = videoPath;
         this.cellVideo.load();
         
