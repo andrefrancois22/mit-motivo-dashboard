@@ -32,19 +32,19 @@
         .main-content {
             flex: 1;
             display: flex;
-            padding: 5px 5px 5px 5px; /* Reduced right padding */
-            gap: 5px; /* Reduced gap */
+            padding: 5px 2px 5px 5px; /* Minimal right padding */
+            gap: 3px; /* Minimal gap between sections */
             background: linear-gradient(135deg, #ffffff, #f8f8f8);
             max-width: calc(100vw - 170px); /* Ensure it doesn't exceed viewport minus sidebar */
         }
 
         .visualization-section {
-            flex: 7; /* Increased further to give more space to video/line plots */
+            flex: 8; /* Increased even more to give more space to video/line plots */
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            max-width: 75%; /* Increased from 70% */
-            min-width: 70%; /* Increased from 65% */
+            max-width: 78%; /* Increased from 75% */
+            min-width: 75%; /* Increased from 70% */
             padding-top: 5px;
         }
 
@@ -85,13 +85,13 @@
         }
 
         .graph-section {
-            flex: 1.2; /* Reduced to give more space to visualization */
+            flex: 1.5; /* Increased to use more of the right space */
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 5px 5px 5px 10px; /* Reduced padding, especially right */
-            min-width: 250px; /* Keep smaller */
-            max-width: 25%; /* Reduced from 28% */
+            padding: 5px 2px 5px 5px; /* Minimal right padding to use all space */
+            min-width: 280px; /* Increased to use more space */
+            max-width: 22%; /* Slightly reduced but will use available space */
         }
 
         .graph-section h3 {
@@ -102,12 +102,12 @@
 
         .curve-canvas {
             background: #ffffff;
-            margin-bottom: 8px; /* Reduced from 15px */
+            margin-bottom: 5px; /* Further reduced spacing */
         }
 
         .mds-canvas {
             background: #ffffff;
-            margin-bottom: 8px; /* Reduced from 15px */
+            margin-bottom: 5px; /* Further reduced spacing */
         }
 
         .graph-info {
@@ -404,19 +404,19 @@
             <div class="visualization-section">
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     <div style="position: relative;">
-                        <canvas id="visualization-canvas" class="visualization-canvas" width="1400" height="1050"></canvas>
-                        <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;" width="1400" height="1050"></canvas>
+                        <canvas id="visualization-canvas" class="visualization-canvas" width="1600" height="1200"></canvas>
+                        <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;" width="1600" height="1200"></canvas>
                     </div>
-                    <canvas id="pwm-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1400" height="320"></canvas>
-                    <canvas id="pmw-lines-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1400" height="320"></canvas>
+                    <canvas id="pwm-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="360"></canvas>
+                    <canvas id="pmw-lines-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="360"></canvas>
                 </div>
             </div>
             <div class="legend-section" id="legend-section">
                 <!-- Legend will be dynamically added here -->
             </div>
             <div class="graph-section">
-                <canvas id="curve-canvas" class="curve-canvas" width="400" height="300"></canvas>
-                <canvas id="mds-canvas" class="mds-canvas" width="400" height="300"></canvas>
+                <canvas id="curve-canvas" class="curve-canvas" width="450" height="340"></canvas>
+                <canvas id="mds-canvas" class="mds-canvas" width="450" height="340"></canvas>
 <!--                 <video id="cell-video" width="200" height="150" style="background: #000; border-radius: 5px; margin-top: 10px;" controls loop>
                     Your browser does not support the video tag.
                 </video> -->
