@@ -2203,8 +2203,8 @@ class MotionVisualizer {
             }
             
             // Draw x-axis labels (vertically oriented)
-            ctx.fillStyle = '#333';
-            ctx.font = '8px Arial'; // Reduced from 10px
+            ctx.fillStyle = '#000'; // Darker color for better visibility
+            ctx.font = '12px Arial'; // Increased from 8px for better visibility
             ctx.textAlign = 'right'; // Align to right so the last letter is at a fixed position
             ctx.textBaseline = 'alphabetic';
             
