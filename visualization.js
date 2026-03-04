@@ -2175,6 +2175,52 @@ class MotionVisualizer {
             ctx.arc(x, y, 2, 0, 2 * Math.PI);
             ctx.fill();
         }
+        
+        // Find and display top 3 words with their probabilities
+        const wordProbs = [];
+        for (let i = 0; i < values.length && i < lexiconLabels.length; i++) {
+            wordProbs.push({
+                word: lexiconLabels[i],
+                prob: values[i],
+                index: i
+            });
+        }
+        
+        // Sort by probability (descending) and take top 3
+        wordProbs.sort((a, b) => b.prob - a.prob);
+        const top3 = wordProbs.slice(0, 3);
+        
+        // Display top 3 words with probabilities
+        ctx.fillStyle = '#333';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        
+        // Position in the left area of the plot, next to the y-axis
+        const textX = margin.left + 5; // Just to the right of the y-axis
+        const textY = margin.top + 5;
+        const lineHeight = 18;
+        
+        // Calculate max text width for background rectangle
+        let maxWidth = ctx.measureText('Top 3 words:').width;
+        top3.forEach((item) => {
+            const probText = item.prob.toFixed(4);
+            const text = `${item.word}: ${probText}`;
+            const width = ctx.measureText(text).width;
+            if (width > maxWidth) maxWidth = width;
+        });
+        
+        // Draw a semi-transparent background for better readability
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillRect(textX - 3, textY - 2, maxWidth + 20, (top3.length + 1) * lineHeight + 4);
+        
+        ctx.fillStyle = '#333';
+        ctx.fillText('Top 3 words:', textX, textY);
+        top3.forEach((item, idx) => {
+            const yPos = textY + (idx + 1) * lineHeight;
+            const probText = item.prob.toFixed(4);
+            ctx.fillText(`${idx + 1}. ${item.word}: ${probText}`, textX, yPos);
+        });
     }
 
     async parseNumpyArray(buffer) {
