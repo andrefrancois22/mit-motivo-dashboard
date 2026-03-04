@@ -1755,6 +1755,12 @@ class MotionVisualizer {
     }
     
     drawLegendOnCanvas(ctx, canvas, margin) {
+        // Defensive checks
+        if (!ctx || !canvas || margin === undefined) {
+            console.warn('drawLegendOnCanvas: Missing required parameters');
+            return;
+        }
+        
         const legendPadding = 10;
         const legendItemHeight = 16;
         const legendItemSpacing = 3;
@@ -1793,32 +1799,39 @@ class MotionVisualizer {
         
         if (legendItems.length === 0) return;
         
-        // Calculate legend dimensions
-        ctx.font = `${legendFontSize}px Arial`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        
-        let maxTextWidth = 0;
-        legendItems.forEach(item => {
-            const textWidth = ctx.measureText(item.label).width;
-            if (textWidth > maxTextWidth) maxTextWidth = textWidth;
-        });
-        
-        const legendWidth = legendSymbolSize + 8 + maxTextWidth + legendPadding * 2;
-        const legendHeight = legendItems.length * legendItemHeight + (legendItems.length - 1) * legendItemSpacing + legendPadding * 2;
-        
-        // Position in bottom right
-        const legendX = canvas.width - margin - legendWidth;
-        const legendY = canvas.height - margin - legendHeight;
-        
-        // Draw background with slight transparency
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect(legendX, legendY, legendWidth, legendHeight);
-        
-        // Draw legend items
-        let currentY = legendY + legendPadding;
-        
-        legendItems.forEach(item => {
+        try {
+            // Calculate legend dimensions
+            ctx.font = `${legendFontSize}px Arial`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            
+            let maxTextWidth = 0;
+            legendItems.forEach(item => {
+                const textWidth = ctx.measureText(item.label).width;
+                if (textWidth > maxTextWidth) maxTextWidth = textWidth;
+            });
+            
+            const legendWidth = legendSymbolSize + 8 + maxTextWidth + legendPadding * 2;
+            const legendHeight = legendItems.length * legendItemHeight + (legendItems.length - 1) * legendItemSpacing + legendPadding * 2;
+            
+            // Position in bottom right
+            const legendX = canvas.width - margin - legendWidth;
+            const legendY = canvas.height - margin - legendHeight;
+            
+            // Ensure legend fits within canvas bounds
+            if (legendX < 0 || legendY < 0) {
+                console.warn('Legend would be outside canvas bounds, adjusting position');
+                return;
+            }
+            
+            // Draw background with slight transparency
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.fillRect(legendX, legendY, legendWidth, legendHeight);
+            
+            // Draw legend items
+            let currentY = legendY + legendPadding;
+            
+            legendItems.forEach(item => {
             const symbolX = legendX + legendPadding;
             const symbolY = currentY + legendItemHeight / 2;
             const textX = symbolX + legendSymbolSize + 8;
@@ -1872,7 +1885,10 @@ class MotionVisualizer {
             ctx.fillText(item.label, textX, textY);
             
             currentY += legendItemHeight + legendItemSpacing;
-        });
+            });
+        } catch (error) {
+            console.error('Error drawing legend on canvas:', error);
+        }
     }
 
     updateLegend() {
