@@ -1212,6 +1212,23 @@ class MotionVisualizer {
             this.updateColorStatus(`${m}x${n} grid, ${parameters} parameters`);
             // this.updateInfo('param-count', parameters);
             
+            // Initialize to the largest parameter index if not already set
+            if (parameters > 0 && (this.currentParameter === 0 || this.currentParameter >= parameters)) {
+                this.currentParameter = parameters - 1;
+                console.log('Initialized to largest parameter index from color grid:', this.currentParameter);
+                
+                // Update color texture
+                this.updateColorTexture();
+                // Load pmw lines if beta values are available
+                if (this.betaValues && this.betaValues.length > 0) {
+                    this.loadPmwLinesData(this.currentParameter);
+                }
+                // Sync curve slider position with current parameter
+                if (this.curveData) {
+                    this.updateCurveSliderFromParameter();
+                }
+            }
+            
             // Update parameter slider
             // const slider = document.getElementById('parameter-slider');
             // slider.max = parameters - 1;
@@ -1254,6 +1271,29 @@ class MotionVisualizer {
             this.betaValues = Array.from(betaData.data);
             console.log('Beta values loaded:', this.betaValues.length, 'values');
             console.log('First few values:', this.betaValues.slice(0, 5));
+            
+            // Initialize to the largest parameter index (based on color grid data if available, otherwise beta values)
+            if (this.colorGridData && this.colorGridData.shape.length === 4) {
+                const [m, n, channels, parameters] = this.colorGridData.shape;
+                if (parameters > 0) {
+                    this.currentParameter = parameters - 1;
+                    console.log('Initialized to largest parameter index from color grid:', this.currentParameter);
+                }
+            } else if (this.betaValues.length > 0) {
+                this.currentParameter = this.betaValues.length - 1;
+                console.log('Initialized to largest beta value at index:', this.currentParameter);
+            }
+            
+            // Update color texture and load pmw lines if data is already loaded
+            if (this.colorGridData) {
+                this.updateColorTexture();
+            }
+            // loadPmwLinesData will handle checking if data is available
+            this.loadPmwLinesData(this.currentParameter);
+            // Sync curve slider position with current parameter (this also calls plotCurve)
+            if (this.curveData) {
+                this.updateCurveSliderFromParameter();
+            }
             
             this.updateBetaStatus(`${this.betaValues.length} beta values loaded`);
             
