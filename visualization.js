@@ -1893,10 +1893,11 @@ class MotionVisualizer {
 
     updateLegend() {
         // Legend is now drawn directly on the IB plot canvas
-        // Clear the HTML legend section
+        // Hide and clear the HTML legend section
         const legendSection = document.getElementById('legend-section');
         if (legendSection) {
             legendSection.innerHTML = '';
+            legendSection.style.display = 'none';
         }
     }
 
@@ -3244,6 +3245,12 @@ class MotionVisualizer {
 
     initializeUI() {
         this.showLoading(false);
+        // Hide the HTML legend section - legend is now drawn on canvas
+        const legendSection = document.getElementById('legend-section');
+        if (legendSection) {
+            legendSection.style.display = 'none';
+            legendSection.innerHTML = '';
+        }
         // this.updateInfo('grid-size', '-');
         // this.updateInfo('cell-size', '-');
         // this.updateInfo('frame-count', '-');
