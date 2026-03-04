@@ -2,11 +2,29 @@ class MotionVisualizer {
     constructor() {
         this.canvas = document.getElementById('visualization-canvas');
         this.overlayCanvas = document.getElementById('overlay-canvas');
-        this.gl = this.canvas.getContext('webgl2') || this.canvas.getContext('webgl');
         
-        if (!this.gl) {
-            this.showError('WebGL not supported in this browser');
-            return;
+        // Check if canvas elements exist
+        if (!this.canvas) {
+            console.error('visualization-canvas element not found!');
+        }
+        if (!this.overlayCanvas) {
+            console.error('overlay-canvas element not found!');
+        }
+        
+        // Try to get WebGL context, but don't fail if unavailable
+        if (this.canvas) {
+            try {
+                this.gl = this.canvas.getContext('webgl2') || this.canvas.getContext('webgl');
+                if (!this.gl) {
+                    console.warn('WebGL not available, some features may be limited');
+                    this.gl = null;
+                }
+            } catch (e) {
+                console.warn('WebGL initialization failed:', e);
+                this.gl = null;
+            }
+        } else {
+            this.gl = null;
         }
         
 
@@ -59,12 +77,113 @@ class MotionVisualizer {
         this.videoTexture = null;
         this.colorTexture = null;
         
-        this.initializeWebGL();
-        this.setupEventListeners();
-        this.initializeUI();
+        // Initialize WebGL only if available
+        try {
+            if (this.gl) {
+                this.initializeWebGL();
+            } else {
+                console.warn('Running without WebGL - using fallback rendering');
+            }
+        } catch (e) {
+            console.error('Error initializing WebGL:', e);
+            this.gl = null;
+        }
+        
+        // Setup event listeners - critical for button functionality
+        try {
+            this.setupEventListeners();
+            console.log('Event listeners set up successfully');
+        } catch (e) {
+            console.error('Error setting up event listeners:', e);
+            // Show error to user
+            this.showError('Failed to initialize event listeners: ' + e.message);
+        }
+        
+        // Initialize UI
+        try {
+            this.initializeUI();
+        } catch (e) {
+            console.error('Error initializing UI:', e);
+        }
+        
+        // Sync canvas sizes after initialization
+        try {
+            this.syncCanvasSizes();
+        } catch (e) {
+            console.error('Error syncing canvas sizes:', e);
+        }
+        
+        // Listen for window resize to sync canvas sizes
+        try {
+            window.addEventListener('resize', () => {
+                this.syncCanvasSizes();
+            });
+        } catch (e) {
+            console.error('Error setting up resize listener:', e);
+        }
+        
+        console.log('MotionVisualizer initialization complete');
+    }
+    
+    syncCanvasSizes() {
+        // Sync main canvas size with CSS display size
+        if (this.canvas) {
+            const rect = this.canvas.getBoundingClientRect();
+            const displayWidth = Math.floor(rect.width);
+            const displayHeight = Math.floor(rect.height);
+            
+            // Only update if size actually changed to avoid unnecessary work
+            if (this.canvas.width !== displayWidth || this.canvas.height !== displayHeight) {
+                this.canvas.width = displayWidth;
+                this.canvas.height = displayHeight;
+                
+                // Update WebGL viewport if available
+                if (this.gl) {
+                    this.gl.viewport(0, 0, displayWidth, displayHeight);
+                }
+            }
+        }
+        
+        // Sync overlay canvas to match main canvas
+        if (this.overlayCanvas && this.canvas) {
+            this.overlayCanvas.width = this.canvas.width;
+            this.overlayCanvas.height = this.canvas.height;
+        }
+        
+        // Sync PWM plot canvas width to match main canvas
+        const pwmCanvas = document.getElementById('pwm-plot-canvas');
+        if (pwmCanvas && this.canvas) {
+            const pwmRect = pwmCanvas.getBoundingClientRect();
+            const pwmDisplayWidth = Math.floor(pwmRect.width);
+            if (pwmCanvas.width !== pwmDisplayWidth) {
+                pwmCanvas.width = pwmDisplayWidth;
+                // Redraw if data is loaded
+                if (this.pwmData && Object.keys(this.pwmData).length > 0) {
+                    this.plotPwm();
+                }
+            }
+        }
+        
+        // Sync PMW lines plot canvas width to match main canvas
+        const pmwLinesCanvas = document.getElementById('pmw-lines-plot-canvas');
+        if (pmwLinesCanvas && this.canvas) {
+            const pmwRect = pmwLinesCanvas.getBoundingClientRect();
+            const pmwDisplayWidth = Math.floor(pmwRect.width);
+            if (pmwLinesCanvas.width !== pmwDisplayWidth) {
+                pmwLinesCanvas.width = pmwDisplayWidth;
+                // Redraw if data is loaded
+                if (this.pmwLinesData) {
+                    this.plotPmwLines();
+                }
+            }
+        }
     }
 
     initializeWebGL() {
+        if (!this.gl) {
+            console.error('Cannot initialize WebGL: context not available');
+            return;
+        }
         // Vertex shader for rendering quads
         const vertexShaderSource = `
             attribute vec2 a_position;
@@ -139,8 +258,18 @@ class MotionVisualizer {
     }
 
     createShaderProgram(vertexSource, fragmentSource) {
+        if (!this.gl) {
+            console.error('Cannot create shader program: WebGL context not available');
+            return null;
+        }
+        
         const vertexShader = this.createShader(this.gl.VERTEX_SHADER, vertexSource);
         const fragmentShader = this.createShader(this.gl.FRAGMENT_SHADER, fragmentSource);
+        
+        if (!vertexShader || !fragmentShader) {
+            console.error('Failed to create shaders');
+            return null;
+        }
         
         const program = this.gl.createProgram();
         this.gl.attachShader(program, vertexShader);
@@ -149,6 +278,7 @@ class MotionVisualizer {
         
         if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
             console.error('Shader program linking failed:', this.gl.getProgramInfoLog(program));
+            this.gl.deleteProgram(program);
             return null;
         }
         
@@ -156,7 +286,17 @@ class MotionVisualizer {
     }
 
     createShader(type, source) {
+        if (!this.gl) {
+            console.error('Cannot create shader: WebGL context not available');
+            return null;
+        }
+        
         const shader = this.gl.createShader(type);
+        if (!shader) {
+            console.error('Failed to create shader object');
+            return null;
+        }
+        
         this.gl.shaderSource(shader, source);
         this.gl.compileShader(shader);
         
@@ -170,6 +310,11 @@ class MotionVisualizer {
     }
 
     createQuadGeometry() {
+        if (!this.gl) {
+            console.error('Cannot create quad geometry: WebGL context not available');
+            return;
+        }
+        
         const positions = new Float32Array([
             -1, -1,  0, 0,
              1, -1,  1, 0,
@@ -183,6 +328,8 @@ class MotionVisualizer {
     }
 
     setupEventListeners() {
+        console.log('Setting up event listeners...');
+        
         // File uploads (optional if inputs exist)
         const videoInput = document.getElementById('video-upload');
         if (videoInput) {
@@ -232,8 +379,11 @@ class MotionVisualizer {
 
         // DTW IB model bulk loader
         const dtwBtn = document.getElementById('load-dtw-model');
+        console.log('Looking for load-dtw-model button:', dtwBtn);
         if (dtwBtn) {
+            console.log('Attaching click listener to load-dtw-model button');
             dtwBtn.addEventListener('click', async () => {
+                console.log('load-dtw-model button clicked!');
                 const statusEl = document.getElementById('dtw-model-status');
                 try {
                     if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qpwr-soft-dtw-0.0...';
@@ -272,8 +422,11 @@ class MotionVisualizer {
 
         // DTW IB model 2 bulk loader
         const dtwBtn2 = document.getElementById('load-dtw-model-2');
+        console.log('Looking for load-dtw-model-2 button:', dtwBtn2);
         if (dtwBtn2) {
+            console.log('Attaching click listener to load-dtw-model-2 button');
             dtwBtn2.addEventListener('click', async () => {
+                console.log('load-dtw-model-2 button clicked!');
                 const statusEl = document.getElementById('dtw-model-status-2');
                 try {
                     if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qpos-soft-dtw-0.0...';
@@ -312,7 +465,9 @@ class MotionVisualizer {
 
         // qvel soft-dtw model bulk loader
         const dtwBtn3 = document.getElementById('load-dtw-model-3');
+        console.log('Looking for load-dtw-model-3 button:', dtwBtn3);
         if (dtwBtn3) {
+            console.log('Attaching click listener to load-dtw-model-3 button');
             dtwBtn3.addEventListener('click', async () => {
                 const statusEl = document.getElementById('dtw-model-status-3');
                 try {
@@ -352,7 +507,9 @@ class MotionVisualizer {
 
         // qfrc_actuator soft-dtw model bulk loader
         const dtwBtn4 = document.getElementById('load-dtw-model-4');
+        console.log('Looking for load-dtw-model-4 button:', dtwBtn4);
         if (dtwBtn4) {
+            console.log('Attaching click listener to load-dtw-model-4 button');
             dtwBtn4.addEventListener('click', async () => {
                 const statusEl = document.getElementById('dtw-model-status-4');
                 try {
@@ -854,14 +1011,21 @@ class MotionVisualizer {
         if (!this.curveData) return null;
         
         const canvas = document.getElementById('curve-canvas');
+        if (!canvas) return null;
+        
         const { x, y } = this.curveData;
         
         // Get the current curve position
         const currentIndex = this.curveSliderPosition;
-        if (currentIndex >= x.length) return null;
+        if (currentIndex >= x.length || currentIndex < 0) return null;
         
         const currentX = x[currentIndex];
         const currentY = y[currentIndex];
+        
+        // Use actual display size, not internal canvas size
+        const rect = canvas.getBoundingClientRect();
+        const displayWidth = rect.width;
+        const displayHeight = rect.height;
         
         // Calculate the same scaling as in plotCurve
         const xMin = Math.min(...x);
@@ -870,11 +1034,11 @@ class MotionVisualizer {
         const yMax = Math.max(...y);
         
         const margin = 40;
-        const plotWidth = canvas.width - 2 * margin;
-        const plotHeight = canvas.height - 2 * margin;
+        const plotWidth = displayWidth - 2 * margin;
+        const plotHeight = displayHeight - 2 * margin;
         
         const scaleX = (val) => margin + ((val - xMin) / (xMax - xMin)) * plotWidth;
-        const scaleY = (val) => canvas.height - margin - ((val - yMin) / (yMax - yMin)) * plotHeight;
+        const scaleY = (val) => displayHeight - margin - ((val - yMin) / (yMax - yMin)) * plotHeight;
         
         return {
             x: scaleX(currentX),
@@ -1588,8 +1752,21 @@ class MotionVisualizer {
         if (!this.curveData) return;
         
         const canvas = document.getElementById('curve-canvas');
+        if (!canvas) return;
+        
         const ctx = canvas.getContext('2d');
         const { x, y } = this.curveData;
+        
+        // Use actual display size, not internal canvas size
+        const rect = canvas.getBoundingClientRect();
+        const displayWidth = Math.floor(rect.width);
+        const displayHeight = Math.floor(rect.height);
+        
+        // Sync canvas internal size to display size
+        if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+            canvas.width = displayWidth;
+            canvas.height = displayHeight;
+        }
         
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2938,6 +3115,10 @@ class MotionVisualizer {
     }
 
     createVideoTexture() {
+        if (!this.gl) {
+            console.warn('Cannot create video texture: WebGL not available');
+            return;
+        }
         if (!this.videoData) return;
         
         const [height, width, channels, frames] = this.videoData.shape;
@@ -2956,7 +3137,7 @@ class MotionVisualizer {
     }
 
     updateVideoFrame(frameIndex) {
-        if (!this.videoData || !this.videoTexture) return;
+        if (!this.gl || !this.videoData || !this.videoTexture) return;
         
         const [height, width, channels, frames] = this.videoData.shape;
         
@@ -2988,6 +3169,10 @@ class MotionVisualizer {
     }
 
     createColorTexture() {
+        if (!this.gl) {
+            console.warn('Cannot create color texture: WebGL not available');
+            return;
+        }
         if (!this.colorGridData) return;
         
         const [m, n, channels, parameters] = this.colorGridData.shape;
@@ -3006,7 +3191,7 @@ class MotionVisualizer {
     }
 
     updateColorTexture() {
-        if (!this.colorGridData || !this.colorTexture) return;
+        if (!this.gl || !this.colorGridData || !this.colorTexture) return;
         
         const [m, n, channels, parameters] = this.colorGridData.shape;
         
@@ -3081,6 +3266,12 @@ class MotionVisualizer {
     render() {
         if (!this.gridInfo || !this.videoTexture || !this.colorTexture) return;
         
+        // Check if WebGL is available
+        if (!this.gl || !this.shaderProgram) {
+            console.warn('Cannot render: WebGL not available');
+            return;
+        }
+        
         // Update frame if playing
         if (this.isPlaying) {
             const now = performance.now();
@@ -3110,20 +3301,22 @@ class MotionVisualizer {
         this.gl.vertexAttribPointer(positionLocation, 2, this.gl.FLOAT, false, 16, 0);
         this.gl.vertexAttribPointer(texCoordLocation, 2, this.gl.FLOAT, false, 16, 8);
         
-        // Set uniforms
-        this.gl.uniform1i(this.gl.getUniformLocation(this.shaderProgram, 'u_videoTexture'), 0);
-        this.gl.uniform1i(this.gl.getUniformLocation(this.shaderProgram, 'u_colorTexture'), 1);
+        // Set uniforms (cache locations and check for null to avoid Firefox warnings)
+        const videoTextureLoc = this.gl.getUniformLocation(this.shaderProgram, 'u_videoTexture');
+        const colorTextureLoc = this.gl.getUniformLocation(this.shaderProgram, 'u_colorTexture');
+        const gridSizeLoc = this.gl.getUniformLocation(this.shaderProgram, 'u_gridSize');
+        const cellSizeLoc = this.gl.getUniformLocation(this.shaderProgram, 'u_cellSize');
+        const videoSizeLoc = this.gl.getUniformLocation(this.shaderProgram, 'u_videoSize');
+        const currentFrameLoc = this.gl.getUniformLocation(this.shaderProgram, 'u_currentFrame');
+        const totalFramesLoc = this.gl.getUniformLocation(this.shaderProgram, 'u_totalFrames');
         
-        this.gl.uniform2f(this.gl.getUniformLocation(this.shaderProgram, 'u_gridSize'), 
-                         this.gridInfo.n, this.gridInfo.m);
-        this.gl.uniform2f(this.gl.getUniformLocation(this.shaderProgram, 'u_cellSize'), 
-                         this.gridInfo.cellWidth, this.gridInfo.cellHeight);
-        this.gl.uniform2f(this.gl.getUniformLocation(this.shaderProgram, 'u_videoSize'), 
-                         this.gridInfo.videoWidth, this.gridInfo.videoHeight);
-        this.gl.uniform1f(this.gl.getUniformLocation(this.shaderProgram, 'u_currentFrame'), 
-                         this.currentFrame);
-        this.gl.uniform1f(this.gl.getUniformLocation(this.shaderProgram, 'u_totalFrames'), 
-                         this.videoData.shape[3]);
+        if (videoTextureLoc !== null) this.gl.uniform1i(videoTextureLoc, 0);
+        if (colorTextureLoc !== null) this.gl.uniform1i(colorTextureLoc, 1);
+        if (gridSizeLoc !== null) this.gl.uniform2f(gridSizeLoc, this.gridInfo.n, this.gridInfo.m);
+        if (cellSizeLoc !== null) this.gl.uniform2f(cellSizeLoc, this.gridInfo.cellWidth, this.gridInfo.cellHeight);
+        if (videoSizeLoc !== null) this.gl.uniform2f(videoSizeLoc, this.gridInfo.videoWidth, this.gridInfo.videoHeight);
+        if (currentFrameLoc !== null) this.gl.uniform1f(currentFrameLoc, this.currentFrame);
+        if (totalFramesLoc !== null) this.gl.uniform1f(totalFramesLoc, this.videoData.shape[3]);
         
         // Set transformation matrix
         this.updateTransform();
@@ -3152,7 +3345,11 @@ class MotionVisualizer {
     }
 
     updateTransform() {
-        if (!this.shaderProgram) return;
+        if (!this.gl || !this.shaderProgram) return;
+        
+        // Ensure the program is active before setting uniforms
+        // (Firefox requires this to be explicit)
+        this.gl.useProgram(this.shaderProgram);
         
         // Create transformation matrix
         const scaleX = this.zoom;
@@ -3167,7 +3364,9 @@ class MotionVisualizer {
         ];
         
         const transformLocation = this.gl.getUniformLocation(this.shaderProgram, 'u_transform');
-        this.gl.uniformMatrix3fv(transformLocation, false, transform);
+        if (transformLocation !== null) {
+            this.gl.uniformMatrix3fv(transformLocation, false, transform);
+        }
     }
     
     loadCellVideo(row, col) {
@@ -3219,7 +3418,18 @@ class MotionVisualizer {
     }
     
     drawHoverBoundingBox() {
-        if (!this.hoveredCell || !this.gridInfo) return;
+        if (!this.hoveredCell || !this.gridInfo || !this.overlayCanvas || !this.canvas) return;
+        
+        // Ensure overlay canvas size matches main canvas
+        const mainRect = this.canvas.getBoundingClientRect();
+        const overlayRect = this.overlayCanvas.getBoundingClientRect();
+        
+        // Sync overlay canvas size to main canvas
+        if (this.overlayCanvas.width !== this.canvas.width || 
+            this.overlayCanvas.height !== this.canvas.height) {
+            this.overlayCanvas.width = this.canvas.width;
+            this.overlayCanvas.height = this.canvas.height;
+        }
         
         // Use the overlay canvas for 2D drawing
         const ctx = this.overlayCanvas.getContext('2d');
@@ -3251,7 +3461,7 @@ class MotionVisualizer {
             (y + translateY) * scaleY
         ]);
         
-        // Convert to screen coordinates
+        // Convert to screen coordinates using actual canvas size
         const screenCorners = corners.map(([x, y]) => [
             (x + 1) * this.overlayCanvas.width / 2,
             (1 - y) * this.overlayCanvas.height / 2
@@ -3331,5 +3541,17 @@ class MotionVisualizer {
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    new MotionVisualizer();
+    console.log('DOMContentLoaded fired, initializing MotionVisualizer...');
+    try {
+        window.visualizer = new MotionVisualizer();
+        console.log('MotionVisualizer instance created:', window.visualizer);
+    } catch (e) {
+        console.error('Failed to create MotionVisualizer:', e);
+        console.error('Error stack:', e.stack);
+        // Show error to user
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'position: fixed; top: 10px; left: 10px; background: red; color: white; padding: 20px; z-index: 10000;';
+        errorDiv.textContent = 'Failed to initialize dashboard: ' + e.message;
+        document.body.appendChild(errorDiv);
+    }
 }); 
