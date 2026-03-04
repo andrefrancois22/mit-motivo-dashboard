@@ -485,13 +485,21 @@ class MotionVisualizer {
 
     // Get the base path for GitHub Pages (e.g., '/repo-name/' or '/')
     getBasePath() {
+        // For local file:// protocol, return an empty string so paths remain relative
+        if (window.location.protocol === 'file:') {
+            return '';
+        }
         let pathname = window.location.pathname;
         // Remove filename if present (e.g., 'index.html')
         if (pathname.includes('/') && !pathname.endsWith('/')) {
             // Extract directory path (everything up to and including the last '/')
             pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
         }
-        // Ensure it ends with a slash (handles root case where pathname is '/')
+        // For root path (just '/'), return '/' (not '//')
+        if (pathname === '/') {
+            return '/';
+        }
+        // Ensure it ends with a slash (handles other cases)
         if (!pathname.endsWith('/')) {
             pathname += '/';
         }
@@ -3017,9 +3025,20 @@ class MotionVisualizer {
         // Use the current data directory if available, otherwise fall back to 'files/'
         const baseDir = this.currentDataDirectory || 'files/';
         const basePath = this.getBasePath();
-        const videoPath = basePath + `${baseDir}videos/video-${row}-${col}.mp4`;
+        
+        // Ensure baseDir ends with a slash for proper path construction
+        const normalizedBaseDir = baseDir.endsWith('/') ? baseDir : baseDir + '/';
+        const videoPath = basePath + `${normalizedBaseDir}videos/video-${row}-${col}.mp4`;
+        
+        console.log('Loading video from:', videoPath);
         this.cellVideo.src = videoPath;
         this.cellVideo.load();
+        
+        // Add error handling for video loading
+        this.cellVideo.addEventListener('error', (e) => {
+            console.error('Error loading video:', videoPath, e);
+            console.error('Video error details:', this.cellVideo.error);
+        });
         
         // Set up event listener to adjust dimensions once video metadata is loaded
         this.cellVideo.addEventListener('loadedmetadata', () => {
