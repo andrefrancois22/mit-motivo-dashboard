@@ -1130,10 +1130,10 @@ class MotionVisualizer {
     }
     
     resizeCanvasToVideoAspectRatio(videoWidth, videoHeight) {
-        // Calculate max width to be 2/3 of viewport width (accounting for sidebar ~170px)
+        // Calculate max width to use more of the available space (accounting for sidebar ~170px)
         const availableWidth = window.innerWidth - 170; // Sidebar width + padding
-        const maxWidth = Math.floor(availableWidth * 0.67); // 2/3 of available width
-        const maxHeight = 600; // Maximum canvas height
+        const maxWidth = Math.floor(availableWidth * 0.75); // Increased to use more space for video/line plots
+        const maxHeight = 1050; // Increased to allow larger canvas
         
         // Calculate aspect ratio
         const aspectRatio = videoWidth / videoHeight;

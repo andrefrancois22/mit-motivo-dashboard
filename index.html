@@ -32,19 +32,19 @@
         .main-content {
             flex: 1;
             display: flex;
-            padding: 5px 2.5px 5px 5px; /* Reduced right padding by half */
-            gap: 10px;
+            padding: 5px 5px 5px 5px; /* Reduced right padding */
+            gap: 5px; /* Reduced gap */
             background: linear-gradient(135deg, #ffffff, #f8f8f8);
             max-width: calc(100vw - 170px); /* Ensure it doesn't exceed viewport minus sidebar */
         }
 
         .visualization-section {
-            flex: 5; /* Increased from 3 to give more space */
+            flex: 7; /* Increased further to give more space to video/line plots */
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            max-width: 66.67%; /* Set to 2/3 of available space */
-            min-width: 60%; /* Ensure minimum width */
+            max-width: 75%; /* Increased from 70% */
+            min-width: 70%; /* Increased from 65% */
             padding-top: 5px;
         }
 
@@ -85,13 +85,13 @@
         }
 
         .graph-section {
-            flex: 1.5; /* Reduced from 2 to give more space to visualization */
+            flex: 1.2; /* Reduced to give more space to visualization */
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 10px 2.5px 10px 10px; /* Reduced right padding to move closer to right margin */
-            min-width: 250px; /* Reduced from 300px */
-            max-width: 30%; /* Reduced from 40% */
+            padding: 5px 5px 5px 10px; /* Reduced padding, especially right */
+            min-width: 250px; /* Keep smaller */
+            max-width: 25%; /* Reduced from 28% */
         }
 
         .graph-section h3 {
@@ -102,12 +102,12 @@
 
         .curve-canvas {
             background: #ffffff;
-            margin-bottom: 15px;
+            margin-bottom: 8px; /* Reduced from 15px */
         }
 
         .mds-canvas {
             background: #ffffff;
-            margin-bottom: 15px;
+            margin-bottom: 8px; /* Reduced from 15px */
         }
 
         .graph-info {
@@ -404,11 +404,11 @@
             <div class="visualization-section">
                 <div style="display: flex; flex-direction: column; align-items: center;">
                     <div style="position: relative;">
-                        <canvas id="visualization-canvas" class="visualization-canvas" width="1000" height="750"></canvas>
-                        <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;" width="1000" height="750"></canvas>
+                        <canvas id="visualization-canvas" class="visualization-canvas" width="1400" height="1050"></canvas>
+                        <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;" width="1400" height="1050"></canvas>
                     </div>
-                    <canvas id="pwm-plot-canvas" style="background: #ffffff; margin-top: 10px;" width="1000" height="250"></canvas>
-                    <canvas id="pmw-lines-plot-canvas" style="background: #ffffff; margin-top: 10px;" width="1000" height="250"></canvas>
+                    <canvas id="pwm-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1400" height="320"></canvas>
+                    <canvas id="pmw-lines-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1400" height="320"></canvas>
                 </div>
             </div>
             <div class="legend-section" id="legend-section">
