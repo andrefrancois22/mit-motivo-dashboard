@@ -1747,92 +1747,140 @@ class MotionVisualizer {
             }
         }
         
-        // Update legend in HTML (separate from canvas drawing)
+        // Draw legend in bottom right of the plot
+        this.drawLegendOnCanvas(ctx, canvas, margin);
+        
+        // Clear HTML legend section (legend is now on canvas)
         this.updateLegend();
     }
-
-    updateLegend() {
-        const legendSection = document.getElementById('legend-section');
-        if (!legendSection) return;
+    
+    drawLegendOnCanvas(ctx, canvas, margin) {
+        const legendPadding = 10;
+        const legendItemHeight = 16;
+        const legendItemSpacing = 3;
+        const legendSymbolSize = 12;
+        const legendFontSize = 11;
         
-        // Clear existing legend
-        legendSection.innerHTML = '';
+        // Calculate legend items
+        const legendItems = [];
         
         // Add hatched area legend (unachievable region)
         if (this.curveData) {
-            const legendItem = document.createElement('div');
-            legendItem.className = 'legend-item';
-            
-            // Create a small canvas to show the hatching pattern
-            const patternCanvas = document.createElement('canvas');
-            patternCanvas.width = 12;
-            patternCanvas.height = 12;
-            const patternCtx = patternCanvas.getContext('2d');
-            
-            // Draw light gray background
-            patternCtx.fillStyle = '#f0f0f0';
-            patternCtx.fillRect(0, 0, 12, 12);
-            
-            // Draw diagonal hatching (reversed orientation: '\')
-            patternCtx.strokeStyle = '#999999'; // Darker gray to match main plot
-            patternCtx.lineWidth = 0.5;
-            // Draw a few diagonal lines from top-left to bottom-right
-            for (let i = -12; i < 12; i += 2) {
-                patternCtx.beginPath();
-                patternCtx.moveTo(i, 12);
-                patternCtx.lineTo(i + 12, 0);
-                patternCtx.stroke();
-            }
-            
-            // Style the canvas to look like the legend circle
-            patternCanvas.style.width = '12px';
-            patternCanvas.style.height = '12px';
-            patternCanvas.style.borderRadius = '2px';
-            patternCanvas.style.border = '2px solid #ffffff';
-            patternCanvas.style.marginRight = '8px';
-            patternCanvas.style.flexShrink = '0';
-            
-            const label = document.createElement('span');
-            label.textContent = 'Unachievable region';
-            
-            legendItem.appendChild(patternCanvas);
-            legendItem.appendChild(label);
-            legendSection.appendChild(legendItem);
+            legendItems.push({
+                type: 'hatched',
+                label: 'Unachievable region'
+            });
         }
         
         // Add reference point legend if available
         if (this.referencePoint) {
-            const legendItem = document.createElement('div');
-            legendItem.className = 'legend-item';
-            
-            const circle = document.createElement('div');
-            circle.className = 'legend-circle';
-            circle.style.backgroundColor = '#0000ff';
-            
-            const label = document.createElement('span');
-            label.textContent = this.referencePoint.label || 'Reference';
-            
-            legendItem.appendChild(circle);
-            legendItem.appendChild(label);
-            legendSection.appendChild(legendItem);
+            legendItems.push({
+                type: 'circle',
+                color: '#0000ff',
+                label: this.referencePoint.label || 'Reference'
+            });
         }
         
         // Add beta value legend for red dot on curve
         if (this.betaValues && this.betaValues.length > this.currentParameter) {
-            const legendItem = document.createElement('div');
-            legendItem.className = 'legend-item';
-            
-            const circle = document.createElement('div');
-            circle.className = 'legend-circle';
-            circle.style.backgroundColor = '#ff4444';
-            
-            const label = document.createElement('span');
             const betaValue = this.betaValues[this.currentParameter].toFixed(4);
-            label.innerHTML = `encoder q(w|m) for β = ${betaValue}`;
+            legendItems.push({
+                type: 'circle',
+                color: '#ff4444',
+                label: `encoder q(w|m) for β = ${betaValue}`
+            });
+        }
+        
+        if (legendItems.length === 0) return;
+        
+        // Calculate legend dimensions
+        ctx.font = `${legendFontSize}px Arial`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        
+        let maxTextWidth = 0;
+        legendItems.forEach(item => {
+            const textWidth = ctx.measureText(item.label).width;
+            if (textWidth > maxTextWidth) maxTextWidth = textWidth;
+        });
+        
+        const legendWidth = legendSymbolSize + 8 + maxTextWidth + legendPadding * 2;
+        const legendHeight = legendItems.length * legendItemHeight + (legendItems.length - 1) * legendItemSpacing + legendPadding * 2;
+        
+        // Position in bottom right
+        const legendX = canvas.width - margin - legendWidth;
+        const legendY = canvas.height - margin - legendHeight;
+        
+        // Draw background with slight transparency
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(legendX, legendY, legendWidth, legendHeight);
+        
+        // Draw legend items
+        let currentY = legendY + legendPadding;
+        
+        legendItems.forEach(item => {
+            const symbolX = legendX + legendPadding;
+            const symbolY = currentY + legendItemHeight / 2;
+            const textX = symbolX + legendSymbolSize + 8;
+            const textY = symbolY;
             
-            legendItem.appendChild(circle);
-            legendItem.appendChild(label);
-            legendSection.appendChild(legendItem);
+            if (item.type === 'hatched') {
+                // Draw hatched pattern with clipping to prevent bleeding
+                ctx.save();
+                
+                // Set clipping region to the square
+                const squareX = symbolX;
+                const squareY = symbolY - legendSymbolSize / 2;
+                const squareSize = legendSymbolSize;
+                ctx.beginPath();
+                ctx.rect(squareX, squareY, squareSize, squareSize);
+                ctx.clip();
+                
+                // Draw background
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(squareX, squareY, squareSize, squareSize);
+                
+                // Draw hatching lines (clipped to square)
+                ctx.strokeStyle = '#999999';
+                ctx.lineWidth = 0.5;
+                for (let i = -squareSize; i < squareSize * 2; i += 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(squareX + i, squareY + squareSize);
+                    ctx.lineTo(squareX + i + squareSize, squareY);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+                
+                // Draw border around the square
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(symbolX, symbolY - legendSymbolSize / 2, legendSymbolSize, legendSymbolSize);
+            } else if (item.type === 'circle') {
+                // Draw circle
+                ctx.fillStyle = item.color;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(symbolX + legendSymbolSize / 2, symbolY, legendSymbolSize / 2 - 1, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            // Draw text
+            ctx.fillStyle = '#333';
+            ctx.fillText(item.label, textX, textY);
+            
+            currentY += legendItemHeight + legendItemSpacing;
+        });
+    }
+
+    updateLegend() {
+        // Legend is now drawn directly on the IB plot canvas
+        // Clear the HTML legend section
+        const legendSection = document.getElementById('legend-section');
+        if (legendSection) {
+            legendSection.innerHTML = '';
         }
     }
 
