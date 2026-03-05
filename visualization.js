@@ -329,212 +329,213 @@ class MotionVisualizer {
 
     setupEventListeners() {
         console.log('Setting up event listeners...');
-        
-        // File uploads (optional if inputs exist)
-        const videoInput = document.getElementById('video-upload');
-        if (videoInput) {
-            videoInput.addEventListener('change', (e) => {
-                this.handleVideoUpload(e.target.files[0]);
-            });
-        }
-        
-        const colorInput = document.getElementById('color-upload');
-        if (colorInput) {
-            colorInput.addEventListener('change', (e) => {
-                this.handleColorUpload(e.target.files[0]);
-            });
-        }
-        
-        const betasInput = document.getElementById('beta-values-input');
-        if (betasInput) {
-            betasInput.addEventListener('change', (e) => {
-                this.handleBetaValuesUpload(e.target.files[0]);
-            });
-        }
-        
-        const curveInput = document.getElementById('curve-values-input');
-        if (curveInput) {
-            curveInput.addEventListener('change', (e) => {
-                this.handleCurveValuesUpload(e.target.files[0]);
-            });
-        }
+        console.log('Document ready state:', document.readyState);
         
         // CRITICAL: Attach button listeners FIRST before any other setup that might fail
         // This ensures buttons work even if other initialization fails
-
-        // DTW IB model bulk loader
-        const dtwBtn = document.getElementById('load-dtw-model');
-        console.log('Looking for load-dtw-model button:', dtwBtn);
-        if (dtwBtn) {
-            console.log('Attaching click listener to load-dtw-model button');
-            // Ensure button has pointer cursor for cross-browser compatibility
-            dtwBtn.style.cursor = 'pointer';
-            dtwBtn.addEventListener('click', async () => {
-                console.log('load-dtw-model button clicked!');
-                const statusEl = document.getElementById('dtw-model-status');
-                try {
-                    if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qpwr-soft-dtw-0.0...';
-                    // First, try to load relative to the project (works on http/https)
-                    const loaded = await this.tryLoadDtwFromRelative();
-                    if (loaded) {
-                        if (statusEl) statusEl.textContent = 'qpwr soft-dtw model loaded from files-wr-36-qpwr-soft-dtw-0.0';
-                        return;
-                    }
-                    if (window.showDirectoryPicker) {
-                        // Fallback: prompt user; hint to Desktop to quickly reach IB-results
-                        const pickerOptions = { id: 'dtw-model', startIn: 'desktop', mode: 'read' };
-                        let dirHandle;
-                        try {
-                            dirHandle = await window.showDirectoryPicker(pickerOptions);
-                        } catch (innerErr) {
-                            // Retry without options if not supported
-                            dirHandle = await window.showDirectoryPicker();
-                        }
-                        await this.loadDtwModelFromDirectory(dirHandle);
-                        if (statusEl) statusEl.textContent = 'qpwr soft-dtw model loaded from selected directory';
-                    } else {
-                        if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
-                    }
-                } catch (e) {
-                    // User cancelled the picker is not an error; just update status quietly
-                    if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
-                        if (statusEl) statusEl.textContent = 'Cancelled folder selection';
-                        return;
-                    }
-                    console.error('DTW load error:', e);
-                    if (statusEl) statusEl.textContent = 'Failed to load qpwr soft-dtw model';
+        // Use a helper function to ensure proper binding and error handling
+        
+        const attachButtonHandler = (buttonId, handler) => {
+            try {
+                const btn = document.getElementById(buttonId);
+                console.log(`Looking for button ${buttonId}:`, btn);
+                if (!btn) {
+                    console.error(`Button ${buttonId} not found in DOM!`);
+                    return false;
                 }
-            });
-        }
+                // Ensure button is visible and clickable
+                btn.style.cursor = 'pointer';
+                btn.style.pointerEvents = 'auto';
+                // Remove any existing listeners to avoid duplicates
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                // Attach listener to the new button
+                newBtn.addEventListener('click', (e) => {
+                    console.log(`Button ${buttonId} clicked!`, e);
+                    e.preventDefault();
+                    e.stopPropagation();
+                    try {
+                        handler.call(this, e);
+                    } catch (err) {
+                        console.error(`Error in button ${buttonId} handler:`, err);
+                        alert(`Error: ${err.message}`);
+                    }
+                }, { capture: false, passive: false });
+                console.log(`Successfully attached listener to ${buttonId}`);
+                return true;
+            } catch (err) {
+                console.error(`Failed to attach listener to ${buttonId}:`, err);
+                return false;
+            }
+        };
 
-        // DTW IB model 2 bulk loader
-        const dtwBtn2 = document.getElementById('load-dtw-model-2');
-        console.log('Looking for load-dtw-model-2 button:', dtwBtn2);
-        if (dtwBtn2) {
-            console.log('Attaching click listener to load-dtw-model-2 button');
-            dtwBtn2.style.cursor = 'pointer';
-            dtwBtn2.addEventListener('click', async () => {
-                console.log('load-dtw-model-2 button clicked!');
-                const statusEl = document.getElementById('dtw-model-status-2');
-                try {
-                    if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qpos-soft-dtw-0.0...';
-                    // First, try to load relative to the project (works on http/https)
-                    const loaded = await this.tryLoadDtwFromRelative2();
-                    if (loaded) {
-                        if (statusEl) statusEl.textContent = 'qpos soft-dtw model loaded from files-wr-36-qpos-soft-dtw-0.0';
-                        return;
-                    }
-                    if (window.showDirectoryPicker) {
-                        // Fallback: prompt user; hint to Desktop to quickly reach IB-results
-                        const pickerOptions = { id: 'dtw-model-2', startIn: 'desktop', mode: 'read' };
-                        let dirHandle;
-                        try {
-                            dirHandle = await window.showDirectoryPicker(pickerOptions);
-                        } catch (innerErr) {
-                            // Retry without options if not supported
-                            dirHandle = await window.showDirectoryPicker();
-                        }
-                        await this.loadDtwModelFromDirectory(dirHandle);
-                        if (statusEl) statusEl.textContent = 'qpos soft-dtw model loaded from selected directory';
-                    } else {
-                        if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
-                    }
-                } catch (e) {
-                    // User cancelled the picker is not an error; just update status quietly
-                    if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
-                        if (statusEl) statusEl.textContent = 'Cancelled folder selection';
-                        return;
-                    }
-                    console.error('DTW load error:', e);
-                    if (statusEl) statusEl.textContent = 'Failed to load qpos soft-dtw model';
+        // DTW IB model bulk loader - Button 1
+        attachButtonHandler('load-dtw-model', async function(e) {
+            console.log('load-dtw-model button clicked!');
+            const statusEl = document.getElementById('dtw-model-status');
+            try {
+                if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qpwr-soft-dtw-0.0...';
+                const loaded = await this.tryLoadDtwFromRelative();
+                if (loaded) {
+                    if (statusEl) statusEl.textContent = 'qpwr soft-dtw model loaded from files-wr-36-qpwr-soft-dtw-0.0';
+                    return;
                 }
-            });
-        }
+                if (window.showDirectoryPicker) {
+                    const pickerOptions = { id: 'dtw-model', startIn: 'desktop', mode: 'read' };
+                    let dirHandle;
+                    try {
+                        dirHandle = await window.showDirectoryPicker(pickerOptions);
+                    } catch (innerErr) {
+                        dirHandle = await window.showDirectoryPicker();
+                    }
+                    await this.loadDtwModelFromDirectory(dirHandle);
+                    if (statusEl) statusEl.textContent = 'qpwr soft-dtw model loaded from selected directory';
+                } else {
+                    if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
+                }
+            } catch (e) {
+                if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
+                    if (statusEl) statusEl.textContent = 'Cancelled folder selection';
+                    return;
+                }
+                console.error('DTW load error:', e);
+                if (statusEl) statusEl.textContent = 'Failed to load qpwr soft-dtw model: ' + (e.message || 'Unknown error');
+            }
+        });
 
-        // qvel soft-dtw model bulk loader
-        const dtwBtn3 = document.getElementById('load-dtw-model-3');
-        console.log('Looking for load-dtw-model-3 button:', dtwBtn3);
-        if (dtwBtn3) {
-            console.log('Attaching click listener to load-dtw-model-3 button');
-            dtwBtn3.style.cursor = 'pointer';
-            dtwBtn3.addEventListener('click', async () => {
-                const statusEl = document.getElementById('dtw-model-status-3');
-                try {
-                    if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qvel-soft-dtw-0.0...';
-                    // First, try to load relative to the project (works on http/https)
-                    const loaded = await this.tryLoadDtwFromRelative3();
-                    if (loaded) {
-                        if (statusEl) statusEl.textContent = 'qvel soft-dtw model loaded from files-wr-36-qvel-soft-dtw-0.0';
-                        return;
-                    }
-                    if (window.showDirectoryPicker) {
-                        // Fallback: prompt user; hint to Desktop to quickly reach IB-results
-                        const pickerOptions = { id: 'dtw-model-3', startIn: 'desktop', mode: 'read' };
-                        let dirHandle;
-                        try {
-                            dirHandle = await window.showDirectoryPicker(pickerOptions);
-                        } catch (innerErr) {
-                            // Retry without options if not supported
-                            dirHandle = await window.showDirectoryPicker();
-                        }
-                        await this.loadDtwModelFromDirectory(dirHandle);
-                        if (statusEl) statusEl.textContent = 'qvel soft-dtw model loaded from selected directory';
-                    } else {
-                        if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
-                    }
-                } catch (e) {
-                    // User cancelled the picker is not an error; just update status quietly
-                    if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
-                        if (statusEl) statusEl.textContent = 'Cancelled folder selection';
-                        return;
-                    }
-                    console.error('DTW load error:', e);
-                    if (statusEl) statusEl.textContent = 'Failed to load qvel soft-dtw model';
+        // DTW IB model bulk loader - Button 2
+        attachButtonHandler('load-dtw-model-2', async function(e) {
+            console.log('load-dtw-model-2 button clicked!');
+            const statusEl = document.getElementById('dtw-model-status-2');
+            try {
+                if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qpos-soft-dtw-0.0...';
+                const loaded = await this.tryLoadDtwFromRelative2();
+                if (loaded) {
+                    if (statusEl) statusEl.textContent = 'qpos soft-dtw model loaded from files-wr-36-qpos-soft-dtw-0.0';
+                    return;
                 }
-            });
-        }
+                if (window.showDirectoryPicker) {
+                    const pickerOptions = { id: 'dtw-model-2', startIn: 'desktop', mode: 'read' };
+                    let dirHandle;
+                    try {
+                        dirHandle = await window.showDirectoryPicker(pickerOptions);
+                    } catch (innerErr) {
+                        dirHandle = await window.showDirectoryPicker();
+                    }
+                    await this.loadDtwModelFromDirectory(dirHandle);
+                    if (statusEl) statusEl.textContent = 'qpos soft-dtw model loaded from selected directory';
+                } else {
+                    if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
+                }
+            } catch (e) {
+                if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
+                    if (statusEl) statusEl.textContent = 'Cancelled folder selection';
+                    return;
+                }
+                console.error('DTW load error:', e);
+                if (statusEl) statusEl.textContent = 'Failed to load qpos soft-dtw model: ' + (e.message || 'Unknown error');
+            }
+        });
 
-        // qfrc_actuator soft-dtw model bulk loader
-        const dtwBtn4 = document.getElementById('load-dtw-model-4');
-        console.log('Looking for load-dtw-model-4 button:', dtwBtn4);
-        if (dtwBtn4) {
-            console.log('Attaching click listener to load-dtw-model-4 button');
-            dtwBtn4.style.cursor = 'pointer';
-            dtwBtn4.addEventListener('click', async () => {
-                const statusEl = document.getElementById('dtw-model-status-4');
-                try {
-                    if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qfrc_actuator-soft-dtw-0.0...';
-                    // First, try to load relative to the project (works on http/https)
-                    const loaded = await this.tryLoadDtwFromRelative4();
-                    if (loaded) {
-                        if (statusEl) statusEl.textContent = 'qfrc_actuator soft-dtw model loaded from files-wr-36-qfrc_actuator-soft-dtw-0.0';
-                        return;
-                    }
-                    if (window.showDirectoryPicker) {
-                        // Fallback: prompt user; hint to Desktop to quickly reach IB-results
-                        const pickerOptions = { id: 'dtw-model-4', startIn: 'desktop', mode: 'read' };
-                        let dirHandle;
-                        try {
-                            dirHandle = await window.showDirectoryPicker(pickerOptions);
-                        } catch (innerErr) {
-                            // Retry without options if not supported
-                            dirHandle = await window.showDirectoryPicker();
-                        }
-                        await this.loadDtwModelFromDirectory(dirHandle);
-                        if (statusEl) statusEl.textContent = 'qfrc_actuator soft-dtw model loaded from selected directory';
-                    } else {
-                        if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
-                    }
-                } catch (e) {
-                    // User cancelled the picker is not an error; just update status quietly
-                    if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
-                        if (statusEl) statusEl.textContent = 'Cancelled folder selection';
-                        return;
-                    }
-                    console.error('DTW load error:', e);
-                    if (statusEl) statusEl.textContent = 'Failed to load qfrc_actuator soft-dtw model';
+        // DTW IB model bulk loader - Button 3
+        attachButtonHandler('load-dtw-model-3', async function(e) {
+            console.log('load-dtw-model-3 button clicked!');
+            const statusEl = document.getElementById('dtw-model-status-3');
+            try {
+                if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qvel-soft-dtw-0.0...';
+                const loaded = await this.tryLoadDtwFromRelative3();
+                if (loaded) {
+                    if (statusEl) statusEl.textContent = 'qvel soft-dtw model loaded from files-wr-36-qvel-soft-dtw-0.0';
+                    return;
                 }
-            });
+                if (window.showDirectoryPicker) {
+                    const pickerOptions = { id: 'dtw-model-3', startIn: 'desktop', mode: 'read' };
+                    let dirHandle;
+                    try {
+                        dirHandle = await window.showDirectoryPicker(pickerOptions);
+                    } catch (innerErr) {
+                        dirHandle = await window.showDirectoryPicker();
+                    }
+                    await this.loadDtwModelFromDirectory(dirHandle);
+                    if (statusEl) statusEl.textContent = 'qvel soft-dtw model loaded from selected directory';
+                } else {
+                    if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
+                }
+            } catch (e) {
+                if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
+                    if (statusEl) statusEl.textContent = 'Cancelled folder selection';
+                    return;
+                }
+                console.error('DTW load error:', e);
+                if (statusEl) statusEl.textContent = 'Failed to load qvel soft-dtw model: ' + (e.message || 'Unknown error');
+            }
+        });
+
+        // DTW IB model bulk loader - Button 4
+        attachButtonHandler('load-dtw-model-4', async function(e) {
+            console.log('load-dtw-model-4 button clicked!');
+            const statusEl = document.getElementById('dtw-model-status-4');
+            try {
+                if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-qfrc_actuator-soft-dtw-0.0...';
+                const loaded = await this.tryLoadDtwFromRelative4();
+                if (loaded) {
+                    if (statusEl) statusEl.textContent = 'qfrc_actuator soft-dtw model loaded from files-wr-36-qfrc_actuator-soft-dtw-0.0';
+                    return;
+                }
+                if (window.showDirectoryPicker) {
+                    const pickerOptions = { id: 'dtw-model-4', startIn: 'desktop', mode: 'read' };
+                    let dirHandle;
+                    try {
+                        dirHandle = await window.showDirectoryPicker(pickerOptions);
+                    } catch (innerErr) {
+                        dirHandle = await window.showDirectoryPicker();
+                    }
+                    await this.loadDtwModelFromDirectory(dirHandle);
+                    if (statusEl) statusEl.textContent = 'qfrc_actuator soft-dtw model loaded from selected directory';
+                } else {
+                    if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
+                }
+            } catch (e) {
+                if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
+                    if (statusEl) statusEl.textContent = 'Cancelled folder selection';
+                    return;
+                }
+                console.error('DTW load error:', e);
+                if (statusEl) statusEl.textContent = 'Failed to load qfrc_actuator soft-dtw model: ' + (e.message || 'Unknown error');
+            }
+        });
+        
+        // File uploads (optional if inputs exist) - moved after buttons
+        try {
+            const videoInput = document.getElementById('video-upload');
+            if (videoInput) {
+                videoInput.addEventListener('change', (e) => {
+                    this.handleVideoUpload(e.target.files[0]);
+                });
+            }
+            
+            const colorInput = document.getElementById('color-upload');
+            if (colorInput) {
+                colorInput.addEventListener('change', (e) => {
+                    this.handleColorUpload(e.target.files[0]);
+                });
+            }
+            
+            const betasInput = document.getElementById('beta-values-input');
+            if (betasInput) {
+                betasInput.addEventListener('change', (e) => {
+                    this.handleBetaValuesUpload(e.target.files[0]);
+                });
+            }
+            
+            const curveInput = document.getElementById('curve-values-input');
+            if (curveInput) {
+                curveInput.addEventListener('change', (e) => {
+                    this.handleCurveValuesUpload(e.target.files[0]);
+                });
+            }
+        } catch (e) {
+            console.error('Error setting up file input listeners:', e);
         }
         
         // Now set up other event listeners - wrapped in try-catch so failures don't block buttons
