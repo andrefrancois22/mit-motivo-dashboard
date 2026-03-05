@@ -359,29 +359,16 @@ class MotionVisualizer {
             });
         }
         
-        // Curve slider mouse events
-        this.setupCurveSliderEvents();
-        
-        // Parameter slider
-        // const slider = document.getElementById('parameter-slider');
-        // slider.addEventListener('input', (e) => {
-            // this.currentParameter = parseInt(e.target.value);
-            // this.updateParameterDisplay();
-            // this.updateColorTexture();
-            // this.updateCurveSliderFromParameter();
-        // });
-        
-        // Mouse controls for pan
-        this.setupMouseControls();
-        
-        // Mouse hover for cell highlighting
-        this.setupHoverControls();
+        // CRITICAL: Attach button listeners FIRST before any other setup that might fail
+        // This ensures buttons work even if other initialization fails
 
         // DTW IB model bulk loader
         const dtwBtn = document.getElementById('load-dtw-model');
         console.log('Looking for load-dtw-model button:', dtwBtn);
         if (dtwBtn) {
             console.log('Attaching click listener to load-dtw-model button');
+            // Ensure button has pointer cursor for cross-browser compatibility
+            dtwBtn.style.cursor = 'pointer';
             dtwBtn.addEventListener('click', async () => {
                 console.log('load-dtw-model button clicked!');
                 const statusEl = document.getElementById('dtw-model-status');
@@ -425,6 +412,7 @@ class MotionVisualizer {
         console.log('Looking for load-dtw-model-2 button:', dtwBtn2);
         if (dtwBtn2) {
             console.log('Attaching click listener to load-dtw-model-2 button');
+            dtwBtn2.style.cursor = 'pointer';
             dtwBtn2.addEventListener('click', async () => {
                 console.log('load-dtw-model-2 button clicked!');
                 const statusEl = document.getElementById('dtw-model-status-2');
@@ -468,6 +456,7 @@ class MotionVisualizer {
         console.log('Looking for load-dtw-model-3 button:', dtwBtn3);
         if (dtwBtn3) {
             console.log('Attaching click listener to load-dtw-model-3 button');
+            dtwBtn3.style.cursor = 'pointer';
             dtwBtn3.addEventListener('click', async () => {
                 const statusEl = document.getElementById('dtw-model-status-3');
                 try {
@@ -510,6 +499,7 @@ class MotionVisualizer {
         console.log('Looking for load-dtw-model-4 button:', dtwBtn4);
         if (dtwBtn4) {
             console.log('Attaching click listener to load-dtw-model-4 button');
+            dtwBtn4.style.cursor = 'pointer';
             dtwBtn4.addEventListener('click', async () => {
                 const statusEl = document.getElementById('dtw-model-status-4');
                 try {
@@ -545,6 +535,28 @@ class MotionVisualizer {
                     if (statusEl) statusEl.textContent = 'Failed to load qfrc_actuator soft-dtw model';
                 }
             });
+        }
+        
+        // Now set up other event listeners - wrapped in try-catch so failures don't block buttons
+        // Curve slider mouse events
+        try {
+            this.setupCurveSliderEvents();
+        } catch (e) {
+            console.error('Error setting up curve slider events:', e);
+        }
+        
+        // Mouse controls for pan
+        try {
+            this.setupMouseControls();
+        } catch (e) {
+            console.error('Error setting up mouse controls:', e);
+        }
+        
+        // Mouse hover for cell highlighting
+        try {
+            this.setupHoverControls();
+        } catch (e) {
+            console.error('Error setting up hover controls:', e);
         }
     }
 
@@ -667,10 +679,20 @@ class MotionVisualizer {
     async tryLoadDtwFromRelative() {
         const basePath = this.getBasePath();
         const makeFile = async (url, name) => {
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error('Failed to fetch ' + url);
-            const blob = await resp.blob();
-            return new File([blob], name, { type: 'application/octet-stream' });
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    // Log but don't throw for 404s - this is expected if files don't exist
+                    console.warn(`File not found (${resp.status}): ${url}`);
+                    throw new Error('Failed to fetch ' + url + ' (status: ' + resp.status + ')');
+                }
+                const blob = await resp.blob();
+                return new File([blob], name, { type: 'application/octet-stream' });
+            } catch (e) {
+                // Re-throw with more context
+                console.warn(`Error loading file ${url}:`, e.message);
+                throw e;
+            }
         };
         try {
             const base = basePath + 'files-wr-36-qpwr-soft-dtw-0.0/';
@@ -734,10 +756,20 @@ class MotionVisualizer {
     async tryLoadDtwFromRelative2() {
         const basePath = this.getBasePath();
         const makeFile = async (url, name) => {
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error('Failed to fetch ' + url);
-            const blob = await resp.blob();
-            return new File([blob], name, { type: 'application/octet-stream' });
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    // Log but don't throw for 404s - this is expected if files don't exist
+                    console.warn(`File not found (${resp.status}): ${url}`);
+                    throw new Error('Failed to fetch ' + url + ' (status: ' + resp.status + ')');
+                }
+                const blob = await resp.blob();
+                return new File([blob], name, { type: 'application/octet-stream' });
+            } catch (e) {
+                // Re-throw with more context
+                console.warn(`Error loading file ${url}:`, e.message);
+                throw e;
+            }
         };
         try {
             const base = basePath + 'files-wr-36-qpos-soft-dtw-0.0/';
@@ -801,10 +833,20 @@ class MotionVisualizer {
     async tryLoadDtwFromRelative3() {
         const basePath = this.getBasePath();
         const makeFile = async (url, name) => {
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error('Failed to fetch ' + url);
-            const blob = await resp.blob();
-            return new File([blob], name, { type: 'application/octet-stream' });
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    // Log but don't throw for 404s - this is expected if files don't exist
+                    console.warn(`File not found (${resp.status}): ${url}`);
+                    throw new Error('Failed to fetch ' + url + ' (status: ' + resp.status + ')');
+                }
+                const blob = await resp.blob();
+                return new File([blob], name, { type: 'application/octet-stream' });
+            } catch (e) {
+                // Re-throw with more context
+                console.warn(`Error loading file ${url}:`, e.message);
+                throw e;
+            }
         };
         try {
             const base = basePath + 'files-wr-36-qvel-soft-dtw-0.0/';
@@ -868,10 +910,20 @@ class MotionVisualizer {
     async tryLoadDtwFromRelative4() {
         const basePath = this.getBasePath();
         const makeFile = async (url, name) => {
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error('Failed to fetch ' + url);
-            const blob = await resp.blob();
-            return new File([blob], name, { type: 'application/octet-stream' });
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    // Log but don't throw for 404s - this is expected if files don't exist
+                    console.warn(`File not found (${resp.status}): ${url}`);
+                    throw new Error('Failed to fetch ' + url + ' (status: ' + resp.status + ')');
+                }
+                const blob = await resp.blob();
+                return new File([blob], name, { type: 'application/octet-stream' });
+            } catch (e) {
+                // Re-throw with more context
+                console.warn(`Error loading file ${url}:`, e.message);
+                throw e;
+            }
         };
         try {
             const base = basePath + 'files-wr-36-qfrc_actuator-soft-dtw-0.0/';
@@ -933,6 +985,10 @@ class MotionVisualizer {
     
     setupCurveSliderEvents() {
         const curveCanvas = document.getElementById('curve-canvas');
+        if (!curveCanvas) {
+            console.warn('curve-canvas not found, skipping curve slider events');
+            return;
+        }
         
         curveCanvas.addEventListener('mousedown', (e) => {
             if (!this.curveData) return;
@@ -1164,6 +1220,10 @@ class MotionVisualizer {
     }
 
     setupMouseControls() {
+        if (!this.canvas) {
+            console.warn('Main canvas not found, skipping mouse controls');
+            return;
+        }
         let isDragging = false;
         let lastMousePos = { x: 0, y: 0 };
         
@@ -1198,6 +1258,10 @@ class MotionVisualizer {
     }
     
     setupHoverControls() {
+        if (!this.canvas) {
+            console.warn('Main canvas not found, skipping hover controls');
+            return;
+        }
         this.canvas.addEventListener('mousemove', (e) => {
             if (!this.gridInfo) return;
             
