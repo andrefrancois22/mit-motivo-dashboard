@@ -1351,6 +1351,12 @@ class MotionVisualizer {
                 this.calculateGridInfo();
             }
             
+            // Hide placeholder message once video is loaded
+            const placeholderMessage = document.getElementById('placeholder-message');
+            if (placeholderMessage) {
+                placeholderMessage.style.display = 'none';
+            }
+            
         } catch (error) {
             this.showError('Error loading video: ' + error.message);
         } finally {
