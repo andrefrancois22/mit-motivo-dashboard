@@ -107,19 +107,8 @@ class MotionVisualizer {
         }
         
         // Sync canvas sizes after initialization
-        // Use requestAnimationFrame to ensure layout is complete before syncing
         try {
-            // First attempt - might not have layout yet
             this.syncCanvasSizes();
-            
-            // Second attempt after layout pass - ensures correct sizing on initial load
-            requestAnimationFrame(() => {
-                this.syncCanvasSizes();
-                // Third attempt after another frame - handles edge cases
-                requestAnimationFrame(() => {
-                    this.syncCanvasSizes();
-                });
-            });
         } catch (e) {
             console.error('Error syncing canvas sizes:', e);
         }
@@ -127,33 +116,10 @@ class MotionVisualizer {
         // Listen for window resize to sync canvas sizes
         try {
             window.addEventListener('resize', () => {
-                // Use requestAnimationFrame to sync after resize completes
-                requestAnimationFrame(() => {
-                    this.syncCanvasSizes();
-                });
+                this.syncCanvasSizes();
             });
         } catch (e) {
             console.error('Error setting up resize listener:', e);
-        }
-        
-        // Also use ResizeObserver for more reliable size detection
-        try {
-            if (window.ResizeObserver) {
-                const resizeObserver = new ResizeObserver(() => {
-                    requestAnimationFrame(() => {
-                        this.syncCanvasSizes();
-                    });
-                });
-                
-                // Observe all canvas containers
-                const curveCanvas = document.getElementById('curve-canvas');
-                const mdsCanvas = document.getElementById('mds-canvas');
-                if (curveCanvas) resizeObserver.observe(curveCanvas);
-                if (mdsCanvas) resizeObserver.observe(mdsCanvas);
-                if (this.canvas) resizeObserver.observe(this.canvas);
-            }
-        } catch (e) {
-            console.warn('ResizeObserver not available:', e);
         }
         
         console.log('MotionVisualizer initialization complete');
@@ -182,41 +148,6 @@ class MotionVisualizer {
         if (this.overlayCanvas && this.canvas) {
             this.overlayCanvas.width = this.canvas.width;
             this.overlayCanvas.height = this.canvas.height;
-        }
-        
-        // Sync curve canvas (IB plot) - CRITICAL for red dot positioning
-        const curveCanvas = document.getElementById('curve-canvas');
-        if (curveCanvas) {
-            const curveRect = curveCanvas.getBoundingClientRect();
-            const curveDisplayWidth = Math.floor(curveRect.width);
-            const curveDisplayHeight = Math.floor(curveRect.height);
-            // Only update if size changed and we have valid dimensions
-            if (curveDisplayWidth > 0 && curveDisplayHeight > 0 && 
-                (curveCanvas.width !== curveDisplayWidth || curveCanvas.height !== curveDisplayHeight)) {
-                curveCanvas.width = curveDisplayWidth;
-                curveCanvas.height = curveDisplayHeight;
-                // Redraw curve if data is loaded (this will draw the red dot correctly)
-                if (this.curveData) {
-                    this.plotCurve();
-                }
-            }
-        }
-        
-        // Sync MDS canvas
-        const mdsCanvas = document.getElementById('mds-canvas');
-        if (mdsCanvas) {
-            const mdsRect = mdsCanvas.getBoundingClientRect();
-            const mdsDisplayWidth = Math.floor(mdsRect.width);
-            const mdsDisplayHeight = Math.floor(mdsRect.height);
-            if (mdsDisplayWidth > 0 && mdsDisplayHeight > 0 && 
-                (mdsCanvas.width !== mdsDisplayWidth || mdsCanvas.height !== mdsDisplayHeight)) {
-                mdsCanvas.width = mdsDisplayWidth;
-                mdsCanvas.height = mdsDisplayHeight;
-                // Redraw MDS if data is loaded
-                if (this.mdsData) {
-                    this.plotMds();
-                }
-            }
         }
         
         // Sync PWM plot canvas width to match main canvas
@@ -1895,14 +1826,6 @@ class MotionVisualizer {
         const rect = canvas.getBoundingClientRect();
         const displayWidth = Math.floor(rect.width);
         const displayHeight = Math.floor(rect.height);
-        
-        // Only proceed if we have valid dimensions (layout is complete)
-        // This prevents drawing with wrong coordinates on initial load
-        if (displayWidth <= 0 || displayHeight <= 0) {
-            // Layout not ready yet, retry on next frame
-            requestAnimationFrame(() => this.plotCurve());
-            return;
-        }
         
         // Sync canvas internal size to display size
         if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
