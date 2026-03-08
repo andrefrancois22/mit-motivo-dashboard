@@ -102,14 +102,14 @@
         }
 
         .graph-section {
+            flex: 0 0 auto; /* Don't grow, don't shrink, use auto size */
             display: flex;
-            flex-direction: row; /* Side by side instead of column */
-            align-items: flex-start;
-            justify-content: center;
-            padding: 5px;
-            gap: 10px; /* Space between IB and MDS plots */
-            width: 100%;
-            box-sizing: border-box;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px 2px 5px 5px; /* Minimal right padding to use all space */
+            min-width: 0; /* Allow shrinking */
+            max-width: 30%; /* Increased to ensure it fits */
+            width: 450px; /* Fixed width based on canvas size */
         }
 
         .graph-section h3 {
@@ -120,16 +120,16 @@
 
         .curve-canvas {
             background: #ffffff;
+            margin-bottom: 5px; /* Further reduced spacing */
             max-width: 100%; /* Ensure it doesn't overflow */
             height: auto; /* Maintain aspect ratio */
-            flex: 0 0 auto; /* Don't grow or shrink */
         }
 
         .mds-canvas {
             background: #ffffff;
+            margin-bottom: 5px; /* Further reduced spacing */
             max-width: 100%; /* Ensure it doesn't overflow */
             height: auto; /* Maintain aspect ratio */
-            flex: 0 0 auto; /* Don't grow or shrink */
         }
 
         .graph-info {
@@ -430,22 +430,24 @@
 
         <div class="main-content">
             <div class="visualization-section">
-                <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                <div style="display: flex; flex-direction: column; align-items: center;">
                     <div style="position: relative; width: 100%;">
                         <canvas id="visualization-canvas" class="visualization-canvas" width="1600" height="1200"></canvas>
                         <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 2;" width="1600" height="1200"></canvas>
                     </div>
-                    <canvas id="pwm-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="240"></canvas>
-                    <canvas id="pmw-lines-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="240"></canvas>
-                    <!-- IB and MDS plots placed below p(m|w) line graph, side by side -->
-                    <div class="graph-section">
-                        <canvas id="curve-canvas" class="curve-canvas" width="450" height="340"></canvas>
-                        <canvas id="mds-canvas" class="mds-canvas" width="450" height="340"></canvas>
-                    </div>
+                    <canvas id="pwm-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="360"></canvas>
+                    <canvas id="pmw-lines-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="360"></canvas>
                 </div>
             </div>
             <div class="legend-section" id="legend-section">
                 <!-- Legend will be dynamically added here -->
+            </div>
+            <div class="graph-section">
+                <canvas id="curve-canvas" class="curve-canvas" width="450" height="340"></canvas>
+                <canvas id="mds-canvas" class="mds-canvas" width="450" height="340"></canvas>
+<!--                 <video id="cell-video" width="200" height="150" style="background: #000; border-radius: 5px; margin-top: 10px;" controls loop>
+                    Your browser does not support the video tag.
+                </video> -->
             </div>
         </div>
     </div>
