@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=0.85, maximum-scale=2.0, user-scalable=yes">
     <title>Motion Visualization - Grid Cell Animation</title>
     <style>
         body {
@@ -20,38 +20,49 @@
             height: 100vh;
             padding: 0;
             margin: 0;
+            width: 100vw;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
         }
 
         .sidebar {
             width: 150px;
+            min-width: 150px; /* Ensure minimum width */
+            max-width: 150px; /* Ensure maximum width */
             background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
             padding: 15px;
             overflow-y: auto;
             position: relative;
             z-index: 1000; /* High z-index to ensure sidebar is always on top */
             flex-shrink: 0; /* Prevent sidebar from shrinking */
+            flex-grow: 0; /* Prevent sidebar from growing */
         }
 
         .main-content {
             flex: 1;
             display: flex;
-            padding: 5px 2px 5px 5px; /* Minimal right padding */
+            padding: 5px 2px 5px 20px; /* Increased left padding to push content away from sidebar */
             gap: 3px; /* Minimal gap between sections */
             background: linear-gradient(135deg, #ffffff, #f8f8f8);
-            max-width: calc(100vw - 170px); /* Ensure it doesn't exceed viewport minus sidebar */
+            min-width: 0; /* Allow flex items to shrink below their content size */
             position: relative;
             z-index: 1; /* Lower than sidebar */
+            overflow: hidden; /* Prevent content from overflowing */
+            margin-left: 0; /* Ensure it starts right after sidebar */
+            box-sizing: border-box; /* Include padding in width calculation */
         }
 
         .visualization-section {
-            flex: 8; /* Increased even more to give more space to video/line plots */
+            flex: 1; /* Reduced from 8 - make it smaller */
             display: flex;
-            justify-content: center;
+            justify-content: flex-start; /* Changed from center to push content right */
             align-items: flex-start;
-            max-width: 78%; /* Increased from 75% */
-            min-width: 75%; /* Increased from 70% */
+            max-width: 65%; /* Reduced from 78% */
+            min-width: 0; /* Allow shrinking */
             padding-top: 5px;
+            padding-left: 20px; /* Increased left padding to push away from sidebar */
             position: relative;
+            overflow: hidden; /* Prevent overflow */
+            box-sizing: border-box; /* Include padding in width calculation */
         }
 
         .legend-section {
@@ -91,13 +102,14 @@
         }
 
         .graph-section {
-            flex: 1.5; /* Increased to use more of the right space */
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 5px 2px 5px 5px; /* Minimal right padding to use all space */
-            min-width: 280px; /* Increased to use more space */
-            max-width: 22%; /* Slightly reduced but will use available space */
+            flex-direction: row; /* Side by side instead of column */
+            align-items: flex-start;
+            justify-content: center;
+            padding: 5px;
+            gap: 10px; /* Space between IB and MDS plots */
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .graph-section h3 {
@@ -108,12 +120,16 @@
 
         .curve-canvas {
             background: #ffffff;
-            margin-bottom: 5px; /* Further reduced spacing */
+            max-width: 100%; /* Ensure it doesn't overflow */
+            height: auto; /* Maintain aspect ratio */
+            flex: 0 0 auto; /* Don't grow or shrink */
         }
 
         .mds-canvas {
             background: #ffffff;
-            margin-bottom: 5px; /* Further reduced spacing */
+            max-width: 100%; /* Ensure it doesn't overflow */
+            height: auto; /* Maintain aspect ratio */
+            flex: 0 0 auto; /* Don't grow or shrink */
         }
 
         .graph-info {
@@ -282,7 +298,7 @@
             background: #ffffff;
             width: 100%; /* Ensure it uses full available width */
             max-width: 100%;
-            max-height: 90vh; /* Increased from 85vh to make video larger */
+            max-height: 85vh; /* Reduced from 90vh to make it slightly smaller */
             position: relative; /* Ensure it stays within its container */
             z-index: 1; /* Lower than sidebar */
             pointer-events: auto; /* Ensure canvas is interactive */
@@ -414,24 +430,22 @@
 
         <div class="main-content">
             <div class="visualization-section">
-                <div style="display: flex; flex-direction: column; align-items: center;">
+                <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
                     <div style="position: relative; width: 100%;">
                         <canvas id="visualization-canvas" class="visualization-canvas" width="1600" height="1200"></canvas>
                         <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 2;" width="1600" height="1200"></canvas>
                     </div>
-                    <canvas id="pwm-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="360"></canvas>
-                    <canvas id="pmw-lines-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="360"></canvas>
+                    <canvas id="pwm-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="240"></canvas>
+                    <canvas id="pmw-lines-plot-canvas" style="background: #ffffff; margin-top: 5px;" width="1600" height="240"></canvas>
+                    <!-- IB and MDS plots placed below p(m|w) line graph, side by side -->
+                    <div class="graph-section">
+                        <canvas id="curve-canvas" class="curve-canvas" width="450" height="340"></canvas>
+                        <canvas id="mds-canvas" class="mds-canvas" width="450" height="340"></canvas>
+                    </div>
                 </div>
             </div>
             <div class="legend-section" id="legend-section">
                 <!-- Legend will be dynamically added here -->
-            </div>
-            <div class="graph-section">
-                <canvas id="curve-canvas" class="curve-canvas" width="450" height="340"></canvas>
-                <canvas id="mds-canvas" class="mds-canvas" width="450" height="340"></canvas>
-<!--                 <video id="cell-video" width="200" height="150" style="background: #000; border-radius: 5px; margin-top: 10px;" controls loop>
-                    Your browser does not support the video tag.
-                </video> -->
             </div>
         </div>
     </div>
