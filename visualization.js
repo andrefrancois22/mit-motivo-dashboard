@@ -753,6 +753,28 @@ class MotionVisualizer {
                 await this.handleLexiconLabelsUpload(lexiconFile.file, lexiconFile.name);
             }
         }
+        this.tryRevealPlotTitles();
+    }
+
+    /**
+     * Show HTML plot titles only after core model data is present and plots have been drawn.
+     * Uses double rAF so the browser can paint canvases first.
+     */
+    tryRevealPlotTitles() {
+        if (!this.videoData || !this.colorGridData || !this.betaValues?.length || !this.curveData || !this.gridInfo) {
+            return;
+        }
+        const main = document.querySelector('.main-content');
+        if (!main) return;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                main.classList.add('model-ready');
+                const placeholderMessage = document.getElementById('placeholder-message');
+                if (placeholderMessage) {
+                    placeholderMessage.style.display = 'none';
+                }
+            });
+        });
     }
 
     // Get the base path for GitHub Pages (e.g., '/repo-name/' or '/')
@@ -849,6 +871,7 @@ class MotionVisualizer {
                     // Continue or skip if not found
                 }
             }
+            this.tryRevealPlotTitles();
             return true;
         } catch (e) {
             return false;
@@ -920,6 +943,7 @@ class MotionVisualizer {
                     // Continue or skip if not found
                 }
             }
+            this.tryRevealPlotTitles();
             return true;
         } catch (e) {
             return false;
@@ -997,6 +1021,7 @@ class MotionVisualizer {
                     // Continue or skip if not found
                 }
             }
+            this.tryRevealPlotTitles();
             return true;
         } catch (e) {
             return false;
@@ -1074,6 +1099,7 @@ class MotionVisualizer {
                     // Continue or skip if not found
                 }
             }
+            this.tryRevealPlotTitles();
             return true;
         } catch (e) {
             return false;
@@ -1151,6 +1177,7 @@ class MotionVisualizer {
                     // Continue or skip if not found
                 }
             }
+            this.tryRevealPlotTitles();
             return true;
         } catch (e) {
             return false;
@@ -1228,6 +1255,7 @@ class MotionVisualizer {
                     // Continue or skip if not found
                 }
             }
+            this.tryRevealPlotTitles();
             return true;
         } catch (e) {
             return false;
@@ -1299,6 +1327,7 @@ class MotionVisualizer {
                     // Continue or skip if not found
                 }
             }
+            this.tryRevealPlotTitles();
             return true;
         } catch (e) {
             return false;
@@ -1640,6 +1669,11 @@ class MotionVisualizer {
 
     async handleVideoUpload(file) {
         if (!file) return;
+
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.classList.remove('model-ready');
+        }
         
         this.showLoading(true);
         
@@ -1670,12 +1704,6 @@ class MotionVisualizer {
             // Try to determine grid info if we have both video and color data
             if (this.colorGridData) {
                 this.calculateGridInfo();
-            }
-            
-            // Hide placeholder message once video is loaded
-            const placeholderMessage = document.getElementById('placeholder-message');
-            if (placeholderMessage) {
-                placeholderMessage.style.display = 'none';
             }
             
         } catch (error) {
@@ -1850,6 +1878,7 @@ class MotionVisualizer {
             if (this.curveData) {
                 this.updateCurveSliderFromParameter();
             }
+            this.tryRevealPlotTitles();
             
             this.updateBetaStatus(`${this.betaValues.length} beta values loaded`);
             
@@ -1920,6 +1949,7 @@ class MotionVisualizer {
             this.updateCurveStatus(`${numPoints} data points loaded`);
             this.plotCurve();
             this.updateCurveSliderFromParameter();
+            this.tryRevealPlotTitles();
             
         } catch (error) {
             console.error('Curve upload error:', error);
