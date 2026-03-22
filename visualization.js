@@ -538,6 +538,40 @@ class MotionVisualizer {
                 if (statusEl) statusEl.textContent = 'Failed to load qpwr EMD model: ' + (e.message || 'Unknown error');
             }
         });
+
+        // Prolific similarity model loader (files-wr-36-prolific_similarity-cosine-0.0)
+        attachButtonHandler('load-dtw-model-6', async function(e) {
+            console.log('load-dtw-model-6 button clicked!');
+            const statusEl = document.getElementById('dtw-model-status-6');
+            try {
+                if (statusEl) statusEl.textContent = 'Attempting to load from files-wr-36-prolific_similarity-cosine-0.0...';
+                const loaded = await this.tryLoadDtwFromRelative6();
+                if (loaded) {
+                    if (statusEl) statusEl.textContent = 'prolific similarity model loaded from files-wr-36-prolific_similarity-cosine-0.0';
+                    return;
+                }
+                if (window.showDirectoryPicker) {
+                    const pickerOptions = { id: 'dtw-model-6', startIn: 'desktop', mode: 'read' };
+                    let dirHandle;
+                    try {
+                        dirHandle = await window.showDirectoryPicker(pickerOptions);
+                    } catch (innerErr) {
+                        dirHandle = await window.showDirectoryPicker();
+                    }
+                    await this.loadDtwModelFromDirectory(dirHandle);
+                    if (statusEl) statusEl.textContent = 'prolific similarity model loaded from selected directory';
+                } else {
+                    if (statusEl) statusEl.textContent = 'Directory picker not supported in this browser';
+                }
+            } catch (e) {
+                if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) {
+                    if (statusEl) statusEl.textContent = 'Cancelled folder selection';
+                    return;
+                }
+                console.error('Prolific similarity load error:', e);
+                if (statusEl) statusEl.textContent = 'Failed to load prolific similarity model: ' + (e.message || 'Unknown error');
+            }
+        });
         
         // File uploads (optional if inputs exist) - moved after buttons
         try {
@@ -1072,6 +1106,77 @@ class MotionVisualizer {
                         // PWM colormap not found, skip
                     }
                     // Try to load PWM data and lexicon labels
+                    try {
+                        const pwmDataFile = await makeFile(base + `pwm_${label}.npy`, `pwm_${label}.npy`);
+                        await this.handlePwmDataUpload(pwmDataFile, `pwm_${label}.npy`);
+                    } catch (e) {
+                        // PWM data not found, skip
+                    }
+                    try {
+                        const lexiconFile = await makeFile(base + `lexicon_labels_${label}.pkl`, `lexicon_labels_${label}.pkl`);
+                        await this.handleLexiconLabelsUpload(lexiconFile, `lexicon_labels_${label}.pkl`);
+                    } catch (e) {
+                        // Lexicon labels not found, skip
+                    }
+                    break;
+                } catch (e) {
+                    // Continue or skip if not found
+                }
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Try to load directly from files-wr-36-prolific_similarity-cosine-0.0 directory
+    async tryLoadDtwFromRelative6() {
+        const basePath = this.getBasePath();
+        const makeFile = async (url, name) => {
+            try {
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                    console.warn(`File not found (${resp.status}): ${url}`);
+                    throw new Error('Failed to fetch ' + url + ' (status: ' + resp.status + ')');
+                }
+                const blob = await resp.blob();
+                return new File([blob], name, { type: 'application/octet-stream' });
+            } catch (e) {
+                console.warn(`Error loading file ${url}:`, e.message);
+                throw e;
+            }
+        };
+        try {
+            const base = basePath + 'files-wr-36-prolific_similarity-cosine-0.0/';
+            this.currentDataDirectory = 'files-wr-36-prolific_similarity-cosine-0.0/';
+            const videoFile = await makeFile(base + 'video_gray.npy_prepped_video.npy', 'video_gray.npy_prepped_video.npy');
+            const colorFile = await makeFile(base + 'colormap_n_951.npy', 'colormap_n_951.npy');
+            const betasFile = await makeFile(base + 'betas.npy', 'betas.npy');
+            const curveFile = await makeFile(base + 'IB_curve.npy', 'IB_curve.npy');
+            const mdsFile = await makeFile(base + 'dtw_mds.npy', 'dtw_mds.npy');
+
+            await this.handleVideoUpload(videoFile);
+            await this.handleColorUpload(colorFile);
+            await this.handleBetaValuesUpload(betasFile);
+            await this.handleCurveValuesUpload(curveFile);
+            try {
+                await this.handleMdsUpload(mdsFile);
+            } catch (e) {
+                console.log('MDS file not available, skipping...');
+            }
+            const refPointPatterns = ['Ix_Iy_English-Psynet.npy'];
+            for (const pattern of refPointPatterns) {
+                try {
+                    const refFile = await makeFile(base + pattern, pattern);
+                    await this.handleReferencePointUpload(refFile, pattern);
+                    const label = pattern.replace('Ix_Iy_', '').replace('.npy', '');
+                    const pwmPattern = `colormap_pwm_${label}.npy`;
+                    try {
+                        const pwmFile = await makeFile(base + pwmPattern, pwmPattern);
+                        await this.handlePwmColormapUpload(pwmFile, pwmPattern);
+                    } catch (e) {
+                        // PWM colormap not found, skip
+                    }
                     try {
                         const pwmDataFile = await makeFile(base + `pwm_${label}.npy`, `pwm_${label}.npy`);
                         await this.handlePwmDataUpload(pwmDataFile, `pwm_${label}.npy`);
