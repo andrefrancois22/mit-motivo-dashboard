@@ -23,7 +23,7 @@
         }
 
         .sidebar {
-            width: 150px;
+            width: 178px;
             background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
             padding: 15px;
             overflow-y: auto;
@@ -38,7 +38,7 @@
             padding: 5px 2px 5px 5px; /* Minimal right padding */
             gap: 3px; /* Minimal gap between sections */
             background: linear-gradient(135deg, #ffffff, #f8f8f8);
-            max-width: calc(100vw - 170px); /* Ensure it doesn't exceed viewport minus sidebar */
+            max-width: calc(100vw - 198px); /* Sidebar + padding */
             position: relative;
             z-index: 1; /* Lower than sidebar */
         }
@@ -179,6 +179,70 @@
         .upload-section {
             margin-bottom: 20px;
             padding: 5px;
+        }
+
+        .model-picker-section-title {
+            font-size: 9px;
+            font-weight: bold;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin: 6px 0 4px 0;
+        }
+
+        .gamma-picker-btn {
+            width: 100%;
+            padding: 5px 2px;
+            margin: 2px 0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+            font-size: 11px;
+            font-weight: 700;
+            position: relative;
+            z-index: 1001;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .gamma-picker-btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.08);
+        }
+
+        .gamma-picker-btn.is-selected {
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px #222;
+        }
+
+        .feature-picker-btn {
+            width: 100%;
+            padding: 4px 2px;
+            margin: 2px 0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            line-height: 1.25;
+            position: relative;
+            z-index: 1001;
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+
+        .feature-picker-btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.06);
+        }
+
+        .feature-picker-btn.is-selected {
+            box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0d47a1;
+        }
+
+        .feature-picker-btn.variant-blue {
+            background: linear-gradient(135deg, #0d47a1, #1565c0);
         }
 
         .upload-section h3 {
@@ -418,16 +482,7 @@
     <div class="container">
         <div class="sidebar">
             <!-- <h1>Model</h1> -->
-            <div class="upload-section">
-                <button id="load-dtw-model" class="control-button" style="background: linear-gradient(135deg, #1b5e20, #2e7d32);">qpwr soft-dtw</button>
-                <button id="load-dtw-model-7" class="control-button" style="background: linear-gradient(135deg, #1b5e20, #2e7d32);">qpwr soft-dtw γ = 1.0</button>
-                <button id="load-dtw-model-2" class="control-button" style="background: linear-gradient(135deg, #1b5e20, #2e7d32);">qpos soft-dtw</button>
-                <button id="load-dtw-model-3" class="control-button" style="background: linear-gradient(135deg, #1b5e20, #2e7d32);">qvel soft-dtw</button>
-                <button id="load-dtw-model-4" class="control-button" style="background: linear-gradient(135deg, #1b5e20, #2e7d32);">qfrc_actuator soft-dtw</button>
-                <button id="load-dtw-model-5" class="control-button" style="background: linear-gradient(135deg, #1b5e20, #2e7d32);">qpwr EMD</button>
-                <button id="load-dtw-model-8" class="control-button" style="background: linear-gradient(135deg, #4a148c, #7b1fa2);">qpos_gc soft-dtw γ = 0</button>
-                <button id="load-dtw-model-6" class="control-button" style="background: linear-gradient(135deg, #0d47a1, #1565c0);">prolific similarity</button>
-            </div>
+            <div id="model-buttons" class="upload-section"></div>
 
             <div class="parameter-control">
                 <!-- <h3> Parameter Control</h3> -->
@@ -464,7 +519,7 @@
 
         <div class="main-content">
             <div id="placeholder-message">
-                <span class="placeholder-arrow" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></span> Select a model from the ones listed in the sidebar
+                <span class="placeholder-arrow" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></span> Choose a γ level and a feature in the sidebar to load a model
             </div>
             <div class="visualization-section">
                 <div style="display: flex; flex-direction: column; align-items: center;">
