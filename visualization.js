@@ -2923,7 +2923,8 @@ class MotionVisualizer {
         return arrays;
     }
 
-    plotBetaSweepLineChart(canvasId, linesData, lineColors, yAxisLabel) {
+    /** @param {number[]|null} lineDash - e.g. [6, 4] for dashed data lines; null/[] for solid */
+    plotBetaSweepLineChart(canvasId, linesData, lineColors, yAxisLabel, lineDash = null) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) {
             console.log(`${canvasId} not found`);
@@ -3057,6 +3058,7 @@ class MotionVisualizer {
 
         const defaultColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 
+        ctx.setLineDash(lineDash && lineDash.length ? lineDash : []);
         for (let lineIdx = 0; lineIdx < linesData.length; lineIdx++) {
             const line = linesData[lineIdx];
             if (!line || line.length === 0) continue;
@@ -3084,6 +3086,7 @@ class MotionVisualizer {
             }
             ctx.stroke();
         }
+        ctx.setLineDash([]);
     }
 
     plotPmwLines() {
@@ -3091,7 +3094,8 @@ class MotionVisualizer {
             'pmw-lines-plot-canvas',
             this.pmwLinesData,
             this.pmwLinesColors,
-            'p(m|w) fixed IB categories'
+            'p(m|w) fixed IB categories',
+            [6, 4]
         );
     }
 
