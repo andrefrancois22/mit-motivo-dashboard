@@ -103,6 +103,8 @@ class MotionVisualizer {
         this.currentDataDirectory = null; // e.g., 'files-wr-36-qpwr-soft-dtw-0.0/'
         this.pmwLinesData = null; // Array of arrays containing line data for current beta
         this.pmwLinesColors = null; // Array of RGB triplets [r, g, b] for each line
+        this.pwmEncoderLinesData = null; // Theoretical encoder p(w|m) lines (same layout as pmw lines)
+        this.pwmEncoderLinesColors = null;
 
         /** Two-step model picker: γ level + feature type → files-wr-36-… folder */
         this.modelPickerGamma = '0.0';
@@ -211,6 +213,18 @@ class MotionVisualizer {
                 // Redraw if data is loaded
                 if (this.pmwLinesData) {
                     this.plotPmwLines();
+                }
+            }
+        }
+
+        const pwmEncCanvas = document.getElementById('pwm-encoder-lines-plot-canvas');
+        if (pwmEncCanvas && this.canvas) {
+            const r = pwmEncCanvas.getBoundingClientRect();
+            const w = Math.floor(r.width);
+            if (pwmEncCanvas.width !== w) {
+                pwmEncCanvas.width = w;
+                if (this.pwmEncoderLinesData) {
+                    this.plotPwmEncoderLines();
                 }
             }
         }
@@ -904,8 +918,8 @@ class MotionVisualizer {
         this.updateColorTexture();
         this.updateLegend();
         
-        // Load and update pmw lines data for new beta index
-        this.loadPmwLinesData(this.currentParameter);
+        // Load and update pmw / encoder line data for new beta index
+        this.loadBetaSweepLinePlots(this.currentParameter);
         
         // Redraw the curve with the updated circle position
         this.plotCurve();
@@ -922,8 +936,8 @@ class MotionVisualizer {
         const normalizedParameter = this.currentParameter / (parameterRange - 1);
         this.curveSliderPosition = Math.floor(normalizedParameter * (x.length - 1));
         
-        // Load and update pmw lines data for new beta index
-        this.loadPmwLinesData(this.currentParameter);
+        // Load and update pmw / encoder line data for new beta index
+        this.loadBetaSweepLinePlots(this.currentParameter);
         
         // Redraw the curve with the updated circle position
         this.plotCurve();
@@ -1164,6 +1178,12 @@ class MotionVisualizer {
             // Redraw the PMW lines plot to update axes
             this.plotPmwLines();
         }
+
+        const pwmEncCanvas = document.getElementById('pwm-encoder-lines-plot-canvas');
+        if (pwmEncCanvas) {
+            pwmEncCanvas.width = newWidth;
+            this.plotPwmEncoderLines();
+        }
         
         // Update WebGL viewport to match new canvas size
         if (this.gl) {
@@ -1210,7 +1230,7 @@ class MotionVisualizer {
                 this.updateColorTexture();
                 // Load pmw lines if beta values are available
                 if (this.betaValues && this.betaValues.length > 0) {
-                    this.loadPmwLinesData(this.currentParameter);
+                    this.loadBetaSweepLinePlots(this.currentParameter);
                 }
                 // Sync curve slider position with current parameter
                 if (this.curveData) {
@@ -1277,8 +1297,8 @@ class MotionVisualizer {
             if (this.colorGridData) {
                 this.updateColorTexture();
             }
-            // loadPmwLinesData will handle checking if data is available
-            this.loadPmwLinesData(this.currentParameter);
+            // loadBetaSweepLinePlots will handle checking if data is available
+            this.loadBetaSweepLinePlots(this.currentParameter);
             // Sync curve slider position with current parameter (this also calls plotCurve)
             if (this.curveData) {
                 this.updateCurveSliderFromParameter();
@@ -2431,6 +2451,14 @@ class MotionVisualizer {
         }
     }
 
+    /** Load p(m|w) and theoretical encoder p(w|m) line families for the IB curve index (in parallel). */
+    async loadBetaSweepLinePlots(betaIndex) {
+        await Promise.all([
+            this.loadPmwLinesData(betaIndex),
+            this.loadPwmEncoderLinesData(betaIndex)
+        ]);
+    }
+
     async loadPmwLinesData(betaIndex) {
         if (!this.currentDataDirectory) {
             console.log('No data directory set, cannot load pmw lines data');
@@ -2656,6 +2684,178 @@ class MotionVisualizer {
         }
     }
 
+    async loadPwmEncoderLinesData(betaIndex) {
+        if (!this.currentDataDirectory) {
+            this.pwmEncoderLinesData = null;
+            this.pwmEncoderLinesColors = null;
+            this.plotPwmEncoderLines();
+            return;
+        }
+
+        try {
+            const filename = `pwm_beta_${betaIndex}_lines.npy`;
+            let file = null;
+
+            if (this.selectedDirectoryHandle) {
+                try {
+                    const pwmDataDir = await this.selectedDirectoryHandle.getDirectoryHandle('pwm_data');
+                    file = await pwmDataDir.getFileHandle(filename).then(h => h.getFile());
+                    console.log('Loaded pwm encoder lines data using directory handle');
+                } catch (e) {
+                    console.log('Could not load pwm encoder lines from directory handle, trying fetch:', e.message);
+                }
+            }
+
+            if (!file) {
+                if (window.location.protocol === 'file:') {
+                    throw new Error('Cannot load files via fetch on file:// protocol. Please serve the files over HTTP/HTTPS or use directory selection.');
+                }
+                const baseDir = this.currentDataDirectory.endsWith('/')
+                    ? this.currentDataDirectory.slice(0, -1)
+                    : this.currentDataDirectory;
+                const basePath = this.getBasePath();
+                const filepath = basePath + `${baseDir}/pwm_data/${filename}`;
+                console.log('Loading pwm encoder lines data from:', filepath);
+                try {
+                    const response = await fetch(filepath);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${filepath}: ${response.status} ${response.statusText}`);
+                    }
+                    const blob = await response.blob();
+                    file = new File([blob], filename, { type: 'application/octet-stream' });
+                } catch (fetchError) {
+                    throw new Error(`Failed to load pwm encoder lines data: ${fetchError.message}. Make sure you're serving the files over HTTP/HTTPS, not opening the HTML file directly.`);
+                }
+            }
+
+            const buffer = await file.arrayBuffer();
+            const parsed = await this.parseNumpyArrayWithPickle(buffer);
+
+            if (parsed.isPickle) {
+                console.log('Parsing pickle format for pwm encoder lines data');
+                const arrays = await this.parsePickledArrays(parsed.buffer, parsed.dataOffset);
+                this.pwmEncoderLinesData = arrays;
+                console.log(`Loaded ${arrays.length} arrays from pwm encoder lines data`);
+            } else {
+                console.log('Parsing regular numpy array format (pwm encoder)');
+                const arrays = this.convertArrayToLineArrays(parsed.data, parsed.shape);
+                this.pwmEncoderLinesData = arrays;
+                console.log(`Converted pwm encoder to ${arrays.length} line arrays`);
+            }
+
+            await this.loadPwmEncoderLinesColors(betaIndex);
+            this.plotPwmEncoderLines();
+        } catch (error) {
+            const isNotFound = error.message.includes('Failed to fetch') ||
+                error.message.includes('404') ||
+                error.message.includes('not found') ||
+                error.message.includes('File not found');
+
+            if (isNotFound) {
+                console.log(`pwm encoder lines data file not found for beta ${betaIndex} (expected when bundle has no pwm_data)`);
+            } else {
+                console.warn('Error loading pwm encoder lines for beta index', betaIndex, ':', error.message);
+                console.warn('File path attempted:', `${this.currentDataDirectory}pwm_data/pwm_beta_${betaIndex}_lines.npy`);
+            }
+            this.pwmEncoderLinesData = null;
+            this.pwmEncoderLinesColors = null;
+            this.plotPwmEncoderLines();
+        }
+    }
+
+    async loadPwmEncoderLinesColors(betaIndex) {
+        if (!this.currentDataDirectory) {
+            this.pwmEncoderLinesColors = null;
+            return;
+        }
+
+        try {
+            const filename = `pwm_beta_${betaIndex}_rgb.npy`;
+            let file = null;
+
+            if (this.selectedDirectoryHandle) {
+                try {
+                    const pwmRgbsDir = await this.selectedDirectoryHandle.getDirectoryHandle('pwm_rgbs');
+                    file = await pwmRgbsDir.getFileHandle(filename).then(h => h.getFile());
+                    console.log('Loaded pwm encoder RGB colors using directory handle');
+                } catch (e) {
+                    console.log('Could not load pwm encoder RGB from directory handle, trying fetch:', e.message);
+                }
+            }
+
+            if (!file) {
+                if (window.location.protocol === 'file:') {
+                    this.pwmEncoderLinesColors = null;
+                    return;
+                }
+                const baseDir = this.currentDataDirectory.endsWith('/')
+                    ? this.currentDataDirectory.slice(0, -1)
+                    : this.currentDataDirectory;
+                const basePath = this.getBasePath();
+                const filepath = basePath + `${baseDir}/pwm_rgbs/${filename}`;
+                console.log('Loading pwm encoder RGB colors from:', filepath);
+                try {
+                    const response = await fetch(filepath);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${filepath}: ${response.status} ${response.statusText}`);
+                    }
+                    const blob = await response.blob();
+                    file = new File([blob], filename, { type: 'application/octet-stream' });
+                } catch (fetchError) {
+                    console.log('pwm encoder RGB file not found, using default colors');
+                    this.pwmEncoderLinesColors = null;
+                    return;
+                }
+            }
+
+            const buffer = await file.arrayBuffer();
+            const parsed = await this.parseNumpyArray(buffer);
+            let rgbColors = [];
+
+            if (parsed.shape.length === 2) {
+                if (parsed.shape[1] === 3) {
+                    const numLines = parsed.shape[0];
+                    const dataArray = Array.from(parsed.data);
+                    for (let i = 0; i < numLines; i++) {
+                        const r = dataArray[i * 3];
+                        const g = dataArray[i * 3 + 1];
+                        const b = dataArray[i * 3 + 2];
+                        const rVal = r <= 1.0 ? Math.round(r * 255) : Math.round(r);
+                        const gVal = g <= 1.0 ? Math.round(g * 255) : Math.round(g);
+                        const bVal = b <= 1.0 ? Math.round(b * 255) : Math.round(b);
+                        rgbColors.push([rVal, gVal, bVal]);
+                    }
+                } else if (parsed.shape[0] === 3) {
+                    const numLines = parsed.shape[1];
+                    const dataArray = Array.from(parsed.data);
+                    for (let i = 0; i < numLines; i++) {
+                        const r = dataArray[i];
+                        const g = dataArray[i + numLines];
+                        const b = dataArray[i + numLines * 2];
+                        const rVal = r <= 1.0 ? Math.round(r * 255) : Math.round(r);
+                        const gVal = g <= 1.0 ? Math.round(g * 255) : Math.round(g);
+                        const bVal = b <= 1.0 ? Math.round(b * 255) : Math.round(b);
+                        rgbColors.push([rVal, gVal, bVal]);
+                    }
+                } else {
+                    console.warn('Unexpected pwm encoder RGB array shape:', parsed.shape);
+                    this.pwmEncoderLinesColors = null;
+                    return;
+                }
+            } else {
+                console.warn('Unexpected pwm encoder RGB array dimensions:', parsed.shape);
+                this.pwmEncoderLinesColors = null;
+                return;
+            }
+
+            this.pwmEncoderLinesColors = rgbColors;
+            console.log(`Loaded ${rgbColors.length} pwm encoder RGB triplets`);
+        } catch (error) {
+            console.log('Error loading pwm encoder RGB colors:', error.message);
+            this.pwmEncoderLinesColors = null;
+        }
+    }
+
     async parsePickledArrays(buffer, dataOffset) {
         // Simplified pickle parser for lists of numpy arrays
         // This is a basic implementation - may need refinement based on actual data format
@@ -2723,14 +2923,13 @@ class MotionVisualizer {
         return arrays;
     }
 
-    plotPmwLines() {
-        const canvas = document.getElementById('pmw-lines-plot-canvas');
+    plotBetaSweepLineChart(canvasId, linesData, lineColors, yAxisLabel) {
+        const canvas = document.getElementById(canvasId);
         if (!canvas) {
-            console.log('pmw-lines-plot-canvas not found');
+            console.log(`${canvasId} not found`);
             return;
         }
 
-        // Match width with pwm plot canvas
         const pwmCanvas = document.getElementById('pwm-plot-canvas');
         if (pwmCanvas && canvas.width !== pwmCanvas.width) {
             canvas.width = pwmCanvas.width;
@@ -2739,11 +2938,10 @@ class MotionVisualizer {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const margin = { top: 20, right: 20, bottom: 60, left: 40 }; // Increased bottom margin to prevent label clipping
+        const margin = { top: 20, right: 20, bottom: 60, left: 40 };
         const plotWidth = canvas.width - margin.left - margin.right;
         const plotHeight = canvas.height - margin.top - margin.bottom;
 
-        // Draw axes
         ctx.strokeStyle = '#666';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -2753,7 +2951,6 @@ class MotionVisualizer {
         ctx.lineTo(margin.left, canvas.height - margin.bottom);
         ctx.stroke();
 
-        // Draw axis labels
         ctx.fillStyle = '#333';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
@@ -2761,18 +2958,16 @@ class MotionVisualizer {
         ctx.save();
         ctx.translate(15, canvas.height / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.fillText('p(m|w) fixed IB categories', 0, 0);
+        ctx.fillText(yAxisLabel, 0, 0);
         ctx.restore();
 
-        if (!this.pmwLinesData || this.pmwLinesData.length === 0) {
-            // No data - just show axes
+        if (!linesData || linesData.length === 0) {
             return;
         }
 
-        // Find global min/max across all lines for scaling
         let globalMin = Infinity;
         let globalMax = -Infinity;
-        for (const line of this.pmwLinesData) {
+        for (const line of linesData) {
             if (line && line.length > 0) {
                 const lineMin = Math.min(...line);
                 const lineMax = Math.max(...line);
@@ -2782,19 +2977,17 @@ class MotionVisualizer {
         }
 
         if (globalMin === Infinity || globalMax === -Infinity) {
-            return; // No valid data
+            return;
         }
 
-        // Get grid dimensions to generate video file names
         let m = 0, n = 0;
         if (this.colorGridData) {
             [m, n] = this.colorGridData.shape;
         } else if (this.gridInfo) {
-            m = this.gridInfo.grid_dimensions[0];
-            n = this.gridInfo.grid_dimensions[1];
+            m = this.gridInfo.m;
+            n = this.gridInfo.n;
         }
-        
-        // Generate video file names for x-axis labels (without 'video' prefix and .mp4 extension)
+
         const videoFileNames = [];
         if (m > 0 && n > 0) {
             for (let row = 0; row < m; row++) {
@@ -2807,65 +3000,52 @@ class MotionVisualizer {
         const valueRange = globalMax - globalMin || 1;
         const scaleX = (idx, length) => margin.left + (idx / (length - 1 || 1)) * plotWidth;
         const scaleY = (val) => canvas.height - margin.bottom - ((val - globalMin) / valueRange) * plotHeight;
-        
-        // Draw x-axis tick labels with video file names
-        if (this.pmwLinesData && this.pmwLinesData.length > 0) {
-            const firstLine = this.pmwLinesData[0];
+
+        if (linesData && linesData.length > 0) {
+            const firstLine = linesData[0];
             const numPoints = firstLine ? firstLine.length : 0;
-            
+
             if (numPoints > 0 && videoFileNames.length === numPoints) {
-                // Draw tick marks and labels
                 ctx.strokeStyle = '#666';
                 ctx.lineWidth = 1;
                 ctx.fillStyle = '#333';
                 ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
-                
-                // Determine how many ticks to show (avoid overcrowding)
-                const maxTicks = Math.min(20, numPoints); // Show at most 20 ticks
+
+                const maxTicks = Math.min(20, numPoints);
                 const tickStep = Math.max(1, Math.floor(numPoints / maxTicks));
-                
-                // Start from index 0 to include the origin
+
                 for (let i = 0; i < numPoints; i += tickStep) {
                     const x = scaleX(i, numPoints);
-                    
-                    // Draw tick mark
                     ctx.beginPath();
                     ctx.moveTo(x, canvas.height - margin.bottom);
                     ctx.lineTo(x, canvas.height - margin.bottom + 5);
                     ctx.stroke();
-                    
-                    // Draw label vertically
                     const label = videoFileNames[i];
                     if (label) {
                         ctx.save();
                         ctx.translate(x, canvas.height - margin.bottom + 25);
-                        ctx.rotate(-Math.PI / 2); // 90 degrees (vertical)
+                        ctx.rotate(-Math.PI / 2);
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(label, 0, 0);
                         ctx.restore();
                     }
                 }
-                
-                // Always show the last label if it's not already included
+
                 if (numPoints > 1 && (numPoints - 1) % tickStep !== 0) {
                     const lastIdx = numPoints - 1;
                     const x = scaleX(lastIdx, numPoints);
-                    
-                    // Draw tick mark
                     ctx.beginPath();
                     ctx.moveTo(x, canvas.height - margin.bottom);
                     ctx.lineTo(x, canvas.height - margin.bottom + 5);
                     ctx.stroke();
-                    
-                    // Draw label vertically
                     const label = videoFileNames[lastIdx];
                     if (label) {
                         ctx.save();
                         ctx.translate(x, canvas.height - margin.bottom + 25);
-                        ctx.rotate(-Math.PI / 2); // 90 degrees (vertical)
+                        ctx.rotate(-Math.PI / 2);
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(label, 0, 0);
@@ -2875,22 +3055,20 @@ class MotionVisualizer {
             }
         }
 
-        // Draw each line with colors from RGB data or default colors
         const defaultColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
-        
-        for (let lineIdx = 0; lineIdx < this.pmwLinesData.length; lineIdx++) {
-            const line = this.pmwLinesData[lineIdx];
+
+        for (let lineIdx = 0; lineIdx < linesData.length; lineIdx++) {
+            const line = linesData[lineIdx];
             if (!line || line.length === 0) continue;
 
-            // Use RGB colors if available, otherwise use default colors
             let color;
-            if (this.pmwLinesColors && this.pmwLinesColors.length > lineIdx) {
-                const [r, g, b] = this.pmwLinesColors[lineIdx];
+            if (lineColors && lineColors.length > lineIdx) {
+                const [r, g, b] = lineColors[lineIdx];
                 color = `rgb(${r}, ${g}, ${b})`;
             } else {
                 color = defaultColors[lineIdx % defaultColors.length];
             }
-            
+
             ctx.strokeStyle = color;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
@@ -2898,7 +3076,6 @@ class MotionVisualizer {
             for (let i = 0; i < line.length; i++) {
                 const x = scaleX(i, line.length);
                 const y = scaleY(line[i]);
-                
                 if (i === 0) {
                     ctx.moveTo(x, y);
                 } else {
@@ -2907,6 +3084,24 @@ class MotionVisualizer {
             }
             ctx.stroke();
         }
+    }
+
+    plotPmwLines() {
+        this.plotBetaSweepLineChart(
+            'pmw-lines-plot-canvas',
+            this.pmwLinesData,
+            this.pmwLinesColors,
+            'p(m|w) fixed IB categories'
+        );
+    }
+
+    plotPwmEncoderLines() {
+        this.plotBetaSweepLineChart(
+            'pwm-encoder-lines-plot-canvas',
+            this.pwmEncoderLinesData,
+            this.pwmEncoderLinesColors,
+            'p(w|m) theoretical encoder'
+        );
     }
 
     calculateGridInfo() {
