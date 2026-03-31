@@ -647,15 +647,14 @@ class MotionVisualizer {
         try {
             const loaded = await this.tryLoadModelFromRelativeFolder(folderDir);
             if (loaded) return;
-            if (window.showDirectoryPicker) {
-                let dirHandle;
-                try {
-                    dirHandle = await window.showDirectoryPicker({ id: 'model-picker-fallback', startIn: 'desktop', mode: 'read' });
-                } catch (innerErr) {
-                    dirHandle = await window.showDirectoryPicker();
-                }
-                await this.loadDtwModelFromDirectory(dirHandle);
-            }
+            // Do not call showDirectoryPicker here: after await the user-gesture is gone, so the
+            // browser throws SecurityError ("Must be handling a user gesture"). Folder pickers must
+            // run synchronously from a click handler, not from this async continuation.
+            this.showError(
+                `Could not load "${label}" from ${folderDir}/ on this site (fetch failed or path wrong). ` +
+                'Serve the dashboard from the repo root or verify the model folder exists.'
+            );
+            console.warn('tryLoadModelFromRelativeFolder returned false for', folderDir);
         } catch (e) {
             if (e && (e.name === 'AbortError' || e.message?.includes('aborted'))) return;
             console.error(`Model load error (${label}):`, e);
